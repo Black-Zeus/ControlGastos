@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Mail, Server, User, Lock, AtSign, ShieldCheck,
-  Save, Send, CheckCircle, AlertCircle, Loader2, RefreshCw, Globe, Search,
+  Save, Send, CheckCircle, AlertCircle, Loader2, RefreshCw, Globe, Search, Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { adminApi, type SmtpSettings, type EmailLog, type GeneralSettings } from '@/lib/adminApi'
+import { adminApi, type SmtpSettings, type EmailLog, type GeneralSettings, type ReminderSettings } from '@/lib/adminApi'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +72,11 @@ export function AdminSettingsPage() {
   const [general, setGeneral]       = useState<GeneralSettings>({ site_url: '' })
   const [savingGen, setSavingGen]   = useState(false)
 
+  // Reminder
+  const [reminder, setReminder]         = useState<ReminderSettings>({ enabled: true })
+  const [savingReminder, setSavingReminder] = useState(false)
+  const [testingReminder, setTestingReminder] = useState(false)
+
   // Email logs
   const [logs, setLogs]             = useState<EmailLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
@@ -83,9 +88,11 @@ export function AdminSettingsPage() {
     Promise.all([
       adminApi.settings.smtp.get(),
       adminApi.settings.general.get(),
-    ]).then(([smtp, gen]) => {
+      adminApi.settings.reminder.get(),
+    ]).then(([smtp, gen, rem]) => {
       setForm(smtp)
       setGeneral(gen)
+      setReminder(rem)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
@@ -133,6 +140,33 @@ export function AdminSettingsPage() {
       showToast('err', err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSavingGen(false)
+    }
+  }
+
+  async function handleSaveReminder(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingReminder(true)
+    try {
+      const updated = await adminApi.settings.reminder.update(reminder)
+      setReminder(updated)
+      showToast('ok', 'Configuración de recordatorios guardada')
+    } catch (err) {
+      showToast('err', err instanceof Error ? err.message : 'Error al guardar')
+    } finally {
+      setSavingReminder(false)
+    }
+  }
+
+  async function handleTestReminder() {
+    setTestingReminder(true)
+    try {
+      await adminApi.settings.reminder.test()
+      showToast('ok', 'Recordatorio en ejecución — revisa el log de envíos en unos segundos')
+    } catch (err) {
+      showToast('err', err instanceof Error ? err.message : 'Error al ejecutar')
+    } finally {
+      setTestingReminder(false)
+      loadLogs()
     }
   }
 
@@ -324,6 +358,67 @@ export function AdminSettingsPage() {
             </div>
           </form>
         </div>
+      </div>
+
+      {/* Recordatorios diarios */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-soft">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-slate-800 px-5 py-4">
+          <Bell size={15} className="text-gray-400 dark:text-slate-500" />
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Recordatorios diarios</h2>
+        </div>
+        <form onSubmit={handleSaveReminder} className="p-5">
+          <p className="mb-4 text-xs text-gray-500 dark:text-slate-400">
+            Envía un email a cada usuario el día anterior a un egreso o ingreso pendiente,
+            agrupando todos sus compromisos del día siguiente. Cada usuario configura su propia hora de envío en su perfil.
+          </p>
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Toggle activo/inactivo */}
+            <label className="flex cursor-pointer items-center gap-3">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={reminder.enabled}
+                  onChange={e => setReminder(r => ({ ...r, enabled: e.target.checked }))}
+                  className="sr-only"
+                />
+                <div className={cn(
+                  'h-5 w-9 rounded-full transition-colors',
+                  reminder.enabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-slate-700',
+                )} />
+                <div className={cn(
+                  'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
+                  reminder.enabled ? 'translate-x-4' : 'translate-x-0.5',
+                )} />
+              </div>
+              <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                {reminder.enabled ? 'Activado globalmente' : 'Desactivado globalmente'}
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={savingReminder}
+              className="flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50 transition-colors"
+            >
+              {savingReminder ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {savingReminder ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              type="button"
+              onClick={handleTestReminder}
+              disabled={testingReminder || !reminder.enabled}
+              className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-40 transition-colors"
+            >
+              {testingReminder ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {testingReminder ? 'Ejecutando…' : 'Ejecutar ahora'}
+            </button>
+            {!reminder.enabled && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Activa los recordatorios para poder ejecutar la prueba.</p>
+            )}
+          </div>
+        </form>
       </div>
 
       {/* Fila inferior — Test email + Mailpit */}

@@ -9,6 +9,9 @@ export interface UserProfile {
   currency: string
   timezone: string
   has_avatar: boolean
+  receive_reminders: boolean
+  reminder_hour: number
+  reminders_globally_enabled: boolean
 }
 
 interface UserStore {

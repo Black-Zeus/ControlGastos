@@ -31,6 +31,11 @@ export const adminApi = {
       update: (body: SmtpSettingsPayload) => request<SmtpSettings>('/v1/admin/settings/smtp', { method: 'PUT', body: JSON.stringify(body) }),
       test:   (to_email: string)          => request<{ detail: string }>('/v1/admin/settings/smtp/test', { method: 'POST', body: JSON.stringify({ to_email }) }),
     },
+    reminder: {
+      get:    ()                              => request<ReminderSettings>('/v1/admin/settings/reminder'),
+      update: (body: ReminderSettingsPayload) => request<ReminderSettings>('/v1/admin/settings/reminder', { method: 'PUT', body: JSON.stringify(body) }),
+      test:   ()                              => request<{ detail: string }>('/v1/admin/settings/reminder/test', { method: 'POST' }),
+    },
   },
   emailLogs: {
     list: (params?: { date_from?: string; date_to?: string; recipient?: string }) => {
@@ -91,6 +96,14 @@ export interface SmtpSettingsPayload {
   smtp_use_tls?: boolean
 }
 
+export interface ReminderSettings {
+  enabled: boolean
+}
+
+export interface ReminderSettingsPayload {
+  enabled: boolean
+}
+
 export interface EmailLog {
   id: string
   sent_at: string
@@ -106,6 +119,10 @@ export interface User {
   name: string
   is_admin: boolean
   is_active: boolean
+  created_at: string
+  last_login_at: string | null
+  periods_open: number
+  periods_closed: number
 }
 
 export interface Category {
