@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.rate_limit import rate_limit
 from app.database import get_db
 from app.models.user import User
+from app.models.settings import AppSetting
 
 _login_limit = rate_limit(max_calls=10, window_seconds=60)
 
@@ -35,11 +37,14 @@ class MeOut(BaseModel):
     timezone: str = "UTC"
     has_avatar: bool = False
     must_change_password: bool = False
+    receive_reminders: bool = True
+    reminder_hour: int = 8
+    reminders_globally_enabled: bool = True
 
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_user(cls, user: "User") -> "MeOut":
+    def from_user(cls, user: "User", *, reminders_globally_enabled: bool = True) -> "MeOut":
         return cls(
             id=user.id,
             email=user.email,
@@ -49,6 +54,9 @@ class MeOut(BaseModel):
             timezone=user.timezone,
             has_avatar=user.avatar_key is not None,
             must_change_password=getattr(user, 'must_change_password', False),
+            receive_reminders=getattr(user, 'receive_reminders', True),
+            reminder_hour=getattr(user, 'reminder_hour', 8),
+            reminders_globally_enabled=reminders_globally_enabled,
         )
 
 
@@ -61,6 +69,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta desactivada")
     if user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usa el acceso de administrador")
+
+    user.last_login_at = datetime.utcnow()
+    await db.commit()
 
     return TokenResponse(
         access_token=create_access_token(user.id, user.token_version),
@@ -93,6 +104,19 @@ async def refresh(body: dict, db: AsyncSession = Depends(get_db)):
     )
 
 
+async def _reminders_globally_enabled(db: AsyncSession) -> bool:
+    row = (await db.execute(
+        select(AppSetting).where(AppSetting.key == "reminder_enabled")
+    )).scalar_one_or_none()
+    if row is None:
+        return True
+    return (row.value or "true").lower() not in ("false", "0", "no")
+
+
 @router.get("/me", response_model=MeOut)
-async def me(current_user: User = Depends(get_current_user)):
-    return MeOut.from_user(current_user)
+async def me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    globally_enabled = await _reminders_globally_enabled(db)
+    return MeOut.from_user(current_user, reminders_globally_enabled=globally_enabled)

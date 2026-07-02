@@ -1,9 +1,42 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, X, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, X, Trash2, AlertTriangle, FolderOpen, FolderCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type User, type UserCreatePayload, type UserUpdatePayload } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+
+function fmtLastLogin(iso: string | null): string {
+  if (!iso) return 'Nunca'
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1)  return 'Ahora mismo'
+  if (m < 60) return `Hace ${m} min`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `Hace ${h} h`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `Hace ${d} días`
+  return new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso))
+}
+
+function PeriodsBadge({ open, closed }: { open: number; closed: number }) {
+  if (open === 0 && closed === 0) {
+    return <span className="text-xs text-gray-400 dark:text-slate-500">Sin períodos</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {open > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 text-[11px] font-medium text-primary-700 dark:text-primary-400">
+          <FolderOpen size={10} /> {open} abierto{open !== 1 ? 's' : ''}
+        </span>
+      )}
+      {closed > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:text-slate-400">
+          <FolderCheck size={10} /> {closed} cerrado{closed !== 1 ? 's' : ''}
+        </span>
+      )}
+    </div>
+  )
+}
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
@@ -189,6 +222,18 @@ export function AdminUsersPage() {
     {
       key: 'is_active', label: 'Estado', sortable: true,
       render: u => <StatusBadge active={u.is_active} onClick={() => toggleActive(u)} />,
+    },
+    {
+      key: 'periods_open', label: 'Períodos', sortable: false,
+      render: u => <PeriodsBadge open={u.periods_open} closed={u.periods_closed} />,
+    },
+    {
+      key: 'last_login_at', label: 'Último acceso', sortable: true,
+      render: u => (
+        <span className={cn('text-xs', u.last_login_at ? 'text-gray-600 dark:text-slate-400' : 'text-gray-400 dark:text-slate-600')}>
+          {fmtLastLogin(u.last_login_at)}
+        </span>
+      ),
     },
   ]
 

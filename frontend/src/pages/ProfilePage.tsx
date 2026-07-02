@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, Camera, Check, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react'
+import { AlertCircle, Bell, BellOff, Camera, Check, Eye, EyeOff, Loader2, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { userApi } from '@/lib/userApi'
@@ -579,6 +579,136 @@ function PasswordForm() {
   )
 }
 
+// ─── NotificationsForm ────────────────────────────────────────────────────────
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
+
+function fmtHour(h: number) {
+  return `${String(h).padStart(2, '0')}:00`
+}
+
+function NotificationsForm() {
+  const { user, updateUser } = useAuth()
+  const [enabled, setEnabled] = useState(user?.receive_reminders ?? true)
+  const [hour, setHour]       = useState(user?.reminder_hour ?? 8)
+  const [saving, setSaving]   = useState(false)
+  const { toast, show } = useToast()
+
+  const globallyEnabled = user?.reminders_globally_enabled ?? true
+  const tzLabel = TIMEZONES.find(t => t.zone === user?.timezone)?.label ?? user?.timezone ?? 'UTC'
+
+  useEffect(() => {
+    if (user) {
+      setEnabled(user.receive_reminders ?? true)
+      setHour(user.reminder_hour ?? 8)
+    }
+  }, [user])
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const updated = await userApi.profile.update({ receive_reminders: enabled, reminder_hour: hour })
+      updateUser({ receive_reminders: updated.receive_reminders, reminder_hour: updated.reminder_hour })
+      show('Preferencia guardada')
+    } catch (err) {
+      show(err instanceof Error ? err.message : 'Error al guardar', 'err')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="flex flex-col flex-1 gap-4">
+      <div className="flex-1 space-y-4">
+
+        {/* Aviso cuando el admin desactivó los recordatorios globalmente */}
+        {!globallyEnabled && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/20">
+            <BellOff size={14} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              El administrador ha desactivado los recordatorios para todos los usuarios. Tu preferencia se conserva pero no recibirás emails hasta que sean reactivados.
+            </p>
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          Cuando está activo, recibirás un email el día anterior a cada egreso o ingreso con estado <strong>pendiente</strong>, con todos tus compromisos del día siguiente agrupados.
+        </p>
+
+        {/* Toggle activar/desactivar */}
+        <label className={cn(
+          'flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-colors',
+          globallyEnabled
+            ? 'border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+            : 'border-gray-100 dark:border-slate-800 opacity-60',
+        )}>
+          <div className="relative mt-0.5 shrink-0">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={e => setEnabled(e.target.checked)}
+              className="sr-only"
+            />
+            <div className={cn(
+              'h-5 w-9 rounded-full transition-colors',
+              enabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-slate-700',
+            )} />
+            <div className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
+              enabled ? 'translate-x-4' : 'translate-x-0.5',
+            )} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-slate-200">
+              {enabled
+                ? <><Bell size={14} className="text-primary-500" /> Recordatorios activados</>
+                : <><BellOff size={14} className="text-gray-400" /> Recordatorios desactivados</>
+              }
+            </div>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+              {enabled
+                ? 'Recibirás un email la noche anterior a cada compromiso pendiente.'
+                : 'No recibirás emails de recordatorio aunque el administrador los tenga habilitados.'}
+            </p>
+          </div>
+        </label>
+
+        {/* Selector de hora */}
+        <div className={cn('transition-opacity', (!enabled || !globallyEnabled) && 'opacity-40 pointer-events-none')}>
+          <label className={labelCls}>Hora de envío</label>
+          <select
+            value={hour}
+            onChange={e => setHour(Number(e.target.value))}
+            disabled={!enabled || !globallyEnabled}
+            className={inputCls}
+          >
+            {HOURS.map(h => (
+              <option key={h} value={h}>{fmtHour(h)}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
+            Zona horaria: <span className="font-medium text-gray-500 dark:text-slate-400">{tzLabel}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="flex justify-end border-t border-gray-100 dark:border-slate-800 pt-4">
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors"
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          {saving ? 'Guardando…' : 'Guardar preferencia'}
+        </button>
+      </div>
+
+      {toast && <ToastBubble toast={toast} />}
+    </form>
+  )
+}
+
 // ─── ProfilePage ──────────────────────────────────────────────────────────────
 
 export function ProfilePage() {
@@ -683,6 +813,12 @@ export function ProfilePage() {
           <h3 className="mb-5 text-sm font-semibold text-gray-800 dark:text-slate-200">Seguridad</h3>
           <PasswordForm />
         </div>
+      </div>
+
+      {/* Notificaciones */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-soft flex flex-col">
+        <h3 className="mb-5 text-sm font-semibold text-gray-800 dark:text-slate-200">Notificaciones</h3>
+        <NotificationsForm />
       </div>
     </div>
   )

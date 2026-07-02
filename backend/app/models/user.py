@@ -21,13 +21,21 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="CLP")
-    timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="UTC")
+    timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="America/Santiago")
     avatar_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     responsible_tags: Mapped[list] = mapped_column(JSONB, nullable=False, server_default='[]')
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_login_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
+    receive_reminders: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    reminder_hour: Mapped[int] = mapped_column(
+        Integer,
+        CheckConstraint("reminder_hour >= 0 AND reminder_hour <= 23", name="ck_users_reminder_hour"),
+        nullable=False,
+        default=8,
+    )
     created_at: Mapped[datetime] = created_at_col()
 
     # Relations

@@ -242,6 +242,45 @@ async def send_period_reopened(
         logger.warning("Error enviando aviso de reapertura a %s: %s", to_email, exc)
 
 
+async def send_daily_reminder(
+    db: AsyncSession,
+    *,
+    to_email: str,
+    user_name: str,
+    tomorrow,
+    expense_items: list[dict],
+    income_items: list[dict],
+    total_expenses: str | None,
+    total_incomes: str | None,
+) -> None:
+    cfg = await _load_smtp(db)
+    if not cfg['host']:
+        logger.info("SMTP no configurado, omitiendo recordatorio para %s", to_email)
+        return
+
+    _MONTHS = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+               'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    date_label = f"{tomorrow.day} de {_MONTHS[tomorrow.month]} de {tomorrow.year}"
+
+    subject, html = _render(
+        'daily_reminder.html',
+        name=user_name,
+        date_label=date_label,
+        expense_items=expense_items,
+        income_items=income_items,
+        total_expenses=total_expenses,
+        total_incomes=total_incomes,
+    )
+    try:
+        _send_raw(cfg, to_email, subject, html)
+        await _write_log(db, to_email, subject, 'ok')
+        logger.info("Recordatorio diario enviado a %s (%d egresos, %d ingresos)",
+                    to_email, len(expense_items), len(income_items))
+    except Exception as exc:
+        await _write_log(db, to_email, subject, 'error', str(exc))
+        logger.warning("Error enviando recordatorio a %s: %s", to_email, exc)
+
+
 async def send_period_report(
     db: AsyncSession,
     *,

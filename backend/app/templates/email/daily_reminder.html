@@ -1,0 +1,67 @@
+{% extends "_base.html" %}
+{% set subject = "Recordatorio: compromisos del " + date_label + " — ControlGastos" %}
+{% block content %}
+<p>Hola <strong>{{ name }}</strong>,</p>
+<p>Te recordamos que mañana, <strong>{{ date_label }}</strong>, tienes los siguientes compromisos financieros pendientes:</p>
+
+{% if expense_items %}
+<table style="width:100%;border-collapse:collapse;margin:20px 0 6px;font-size:13px">
+  <thead>
+    <tr style="background:#fef2f2">
+      <th style="padding:8px 12px;text-align:left;font-weight:600;color:#991b1b;border-radius:8px 0 0 0" colspan="2">Egresos pendientes</th>
+      <th style="padding:8px 12px;text-align:right;font-weight:600;color:#991b1b;border-radius:0 8px 0 0">Monto</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in expense_items %}
+    <tr style="border-bottom:1px solid #fce7f3">
+      <td style="padding:8px 12px;color:#374151;max-width:180px">
+        {{ item.label }}
+        {% if item.responsible %}<br><span style="font-size:11px;color:#9ca3af">{{ item.responsible }}</span>{% endif %}
+      </td>
+      <td style="padding:8px 12px;color:#6b7280;font-size:12px">{{ item.category }}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#dc2626;white-space:nowrap">{{ item.amount }}</td>
+    </tr>
+    {% endfor %}
+    {% if total_expenses %}
+    <tr style="background:#fef2f2">
+      <td colspan="2" style="padding:8px 12px;font-weight:600;color:#374151;border-radius:0 0 0 8px">Total egresos</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:#dc2626;border-radius:0 0 8px 0;white-space:nowrap">{{ total_expenses }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if income_items %}
+<table style="width:100%;border-collapse:collapse;margin:20px 0 6px;font-size:13px">
+  <thead>
+    <tr style="background:#f0fdf4">
+      <th style="padding:8px 12px;text-align:left;font-weight:600;color:#166534;border-radius:8px 0 0 0" colspan="2">Ingresos esperados</th>
+      <th style="padding:8px 12px;text-align:right;font-weight:600;color:#166534;border-radius:0 8px 0 0">Monto</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in income_items %}
+    <tr style="border-bottom:1px solid #dcfce7">
+      <td style="padding:8px 12px;color:#374151;max-width:180px">
+        {{ item.label }}
+        {% if item.responsible %}<br><span style="font-size:11px;color:#9ca3af">{{ item.responsible }}</span>{% endif %}
+      </td>
+      <td style="padding:8px 12px;color:#6b7280;font-size:12px">{{ item.income_type }}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:600;color:#16a34a;white-space:nowrap">{{ item.amount }}</td>
+    </tr>
+    {% endfor %}
+    {% if total_incomes %}
+    <tr style="background:#f0fdf4">
+      <td colspan="2" style="padding:8px 12px;font-weight:600;color:#374151;border-radius:0 0 0 8px">Total ingresos</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:#16a34a;border-radius:0 0 8px 0;white-space:nowrap">{{ total_incomes }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endif %}
+
+<hr class="divider">
+<p class="muted">Este recordatorio se envía automáticamente el día anterior a cada compromiso pendiente. Puedes desactivarlo desde la configuración de administración.</p>
+{% endblock %}

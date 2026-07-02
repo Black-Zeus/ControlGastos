@@ -12,7 +12,7 @@ import uuid
 import hashlib
 import secrets
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -22,7 +22,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.catalog import Category, IncomeType
 from app.models.ingestion import IngestionToken
-from app.models.period import Period
+from app.models.period import Period, PeriodStatus
 from app.models.settings import AppSetting
 from app.models.email_log import EmailLog
 from app.models.password_reset import PasswordResetToken, TokenType
@@ -82,6 +82,9 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db
         if not user.is_admin:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso restringido a administradores")
 
+    user.last_login_at = datetime.utcnow()
+    await db.commit()
+
     return TokenResponse(
         access_token=create_access_token(user.id, user.token_version),
         refresh_token=create_refresh_token(user.id, user.token_version),
@@ -111,8 +114,10 @@ class UserOut(BaseModel):
     name: str
     is_admin: bool
     is_active: bool
-
-    model_config = {"from_attributes": True}
+    created_at: datetime
+    last_login_at: datetime | None = None
+    periods_open: int = 0
+    periods_closed: int = 0
 
 
 class SystemCategoryCreate(BaseModel):
@@ -149,13 +154,52 @@ class IncomeTypeOut(BaseModel):
 
 # ─── Usuarios ────────────────────────────────────────────────────────────────
 
+async def _period_counts(db: AsyncSession, user_id: uuid.UUID) -> tuple[int, int]:
+    open_count = (await db.execute(
+        select(func.count()).select_from(Period)
+        .where(Period.user_id == user_id, Period.status == PeriodStatus.abierto)
+    )).scalar() or 0
+    closed_count = (await db.execute(
+        select(func.count()).select_from(Period)
+        .where(Period.user_id == user_id, Period.status == PeriodStatus.cerrado)
+    )).scalar() or 0
+    return open_count, closed_count
+
+
+def _user_out(user: User, periods_open: int = 0, periods_closed: int = 0) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        is_admin=user.is_admin,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login_at=getattr(user, 'last_login_at', None),
+        periods_open=periods_open,
+        periods_closed=periods_closed,
+    )
+
+
 @router.get("/users", response_model=list[UserOut])
 async def list_users(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ):
-    result = await db.execute(select(User).order_by(User.created_at))
-    return result.scalars().all()
+    open_sq = (
+        select(func.count()).select_from(Period)
+        .where(Period.user_id == User.id, Period.status == PeriodStatus.abierto)
+        .scalar_subquery()
+    )
+    closed_sq = (
+        select(func.count()).select_from(Period)
+        .where(Period.user_id == User.id, Period.status == PeriodStatus.cerrado)
+        .scalar_subquery()
+    )
+    rows = (await db.execute(
+        select(User, open_sq.label('periods_open'), closed_sq.label('periods_closed'))
+        .order_by(User.created_at)
+    )).all()
+    return [_user_out(u, po, pc) for u, po, pc in rows]
 
 
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -180,6 +224,7 @@ async def create_user(
         password_hash=hash_password(body.password),
         name=body.name,
         is_admin=body.is_admin,
+        timezone="America/Santiago",
     )
     db.add(user)
     await db.commit()
@@ -203,7 +248,7 @@ async def create_user(
         import logging
         logging.getLogger(__name__).warning("No se pudo enviar bienvenida a %s: %s", user.email, exc)
 
-    return user
+    return _user_out(user)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -238,7 +283,8 @@ async def update_user(
             db, to_email=user.email, name=user.name, by_admin=True
         )
 
-    return user
+    po, pc = await _period_counts(db, user.id)
+    return _user_out(user, po, pc)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -594,6 +640,62 @@ async def list_email_logs(
         )
         for row in result.scalars().all()
     ]
+
+
+# ─── Configuración de recordatorios ─────────────────────────────────────────
+
+_REMINDER_KEYS = ["reminder_enabled"]
+
+
+class ReminderSettingsOut(BaseModel):
+    enabled: bool
+
+
+class ReminderSettingsIn(BaseModel):
+    enabled: bool = True
+
+
+@router.get("/settings/reminder", response_model=ReminderSettingsOut)
+async def get_reminder_settings(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    rows = (await db.execute(
+        select(AppSetting).where(AppSetting.key.in_(_REMINDER_KEYS))
+    )).scalars().all()
+    raw = {r.key: r.value for r in rows}
+
+    enabled = (raw.get("reminder_enabled") or "true").lower() not in ("false", "0", "no")
+    return ReminderSettingsOut(enabled=enabled)
+
+
+@router.post("/settings/reminder/test", status_code=202)
+async def test_reminder(
+    background_tasks: BackgroundTasks,
+    _admin: User = Depends(get_current_admin),
+):
+    """Fuerza una ejecución inmediata del recordatorio diario (en segundo plano)."""
+    from app.workers.reminder_worker import run_daily_reminder
+    background_tasks.add_task(run_daily_reminder)
+    return {"detail": "Recordatorio diario en ejecución"}
+
+
+@router.put("/settings/reminder", response_model=ReminderSettingsOut)
+async def update_reminder_settings(
+    body: ReminderSettingsIn,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    existing = (await db.execute(
+        select(AppSetting).where(AppSetting.key == "reminder_enabled")
+    )).scalar_one_or_none()
+    if existing:
+        existing.value = "true" if body.enabled else "false"
+    else:
+        db.add(AppSetting(key="reminder_enabled", value="true" if body.enabled else "false"))
+    await db.commit()
+
+    return ReminderSettingsOut(enabled=body.enabled)
 
 
 class IngestionTokenCreate(BaseModel):

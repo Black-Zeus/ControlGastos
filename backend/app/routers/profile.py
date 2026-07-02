@@ -13,7 +13,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import hash_password, verify_password
 from app.database import get_db
 from app.models.user import User
-from app.routers.auth import MeOut
+from app.routers.auth import MeOut, _reminders_globally_enabled
 from app.services import email as email_service
 
 router = APIRouter(prefix="/me", tags=["profile"])
@@ -26,6 +26,8 @@ class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     currency: Optional[str] = None
     timezone: Optional[str] = None
+    receive_reminders: Optional[bool] = None
+    reminder_hour: Optional[int] = None
 
 
 class PasswordChange(BaseModel):
@@ -38,8 +40,12 @@ class AddTagPayload(BaseModel):
 
 
 @router.get("", response_model=MeOut)
-async def get_me(current_user: User = Depends(get_current_user)):
-    return MeOut.from_user(current_user)
+async def get_me(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    globally_enabled = await _reminders_globally_enabled(db)
+    return MeOut.from_user(current_user, reminders_globally_enabled=globally_enabled)
 
 
 @router.patch("", response_model=MeOut)
@@ -63,9 +69,18 @@ async def update_me(
             raise HTTPException(status_code=400, detail="La zona horaria no puede estar vacía")
         current_user.timezone = body.timezone.strip()
 
+    if body.receive_reminders is not None:
+        current_user.receive_reminders = body.receive_reminders
+
+    if body.reminder_hour is not None:
+        if not (0 <= body.reminder_hour <= 23):
+            raise HTTPException(status_code=400, detail="La hora debe estar entre 0 y 23")
+        current_user.reminder_hour = body.reminder_hour
+
     await db.commit()
     await db.refresh(current_user)
-    return MeOut.from_user(current_user)
+    globally_enabled = await _reminders_globally_enabled(db)
+    return MeOut.from_user(current_user, reminders_globally_enabled=globally_enabled)
 
 
 @router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)

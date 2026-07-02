@@ -25,6 +25,8 @@ La idea central es simple: **cada usuario lleva su propio registro de ingresos y
 - **Perfil**: nombre, avatar y cambio de contraseña.
 - **Recuperación de contraseña**: por email con OTP o token de enlace directo.
 
+- **Recordatorios diarios**: el día anterior a cada egreso o ingreso pendiente, el sistema envía automáticamente un email al usuario con todos sus compromisos del día siguiente agrupados en un solo mensaje. Ver [zona horaria](#zona-horaria).
+
 ### Panel de administración
 
 Acceso separado en `/admin` con credenciales propias:
@@ -32,6 +34,7 @@ Acceso separado en `/admin` con credenciales propias:
 - **Usuarios**: crear, activar/desactivar, forzar cambio de contraseña. No permite eliminar al único administrador.
 - **Catálogos del sistema**: categorías y tipos de ingreso disponibles como base para todos los usuarios.
 - **Configuración SMTP**: servidor de correo para envío de bienvenida, recuperación y reportes.
+- **Recordatorios**: activar/desactivar los recordatorios diarios y configurar la hora de envío.
 - **Primer acceso bootstrap**: en una instalación nueva sin usuarios, cualquier email con contraseña `admin` crea el primer administrador y fuerza el cambio de contraseña inmediato.
 
 ---
@@ -143,6 +146,16 @@ El módulo de tokens de ingesta ya está implementado: el administrador puede ge
 ### OCR sobre evidencias
 
 La infraestructura está en su lugar: el contenedor `ocr-worker` corre con Tesseract instalado (español e inglés), el modelo de datos tiene el campo `ocr_raw_text` en los adjuntos y el worker ya hace polling sobre la base de datos buscando imágenes pendientes. Lo que falta es la implementación del procesamiento en sí: descargar la imagen desde MinIO, pasarla por `pytesseract` y guardar el texto extraído. Una segunda fase parseará ese texto para sugerir automáticamente el monto y la fecha del gasto.
+
+---
+
+## Zona horaria
+
+La aplicación está diseñada para uso en Chile. El scheduler de recordatorios usa **`America/Santiago`** como zona horaria base para la hora de envío (configurable en el panel de administración, por defecto las 08:00).
+
+Cada usuario puede configurar su propia zona horaria en su perfil. El worker calcula "mañana" en la zona horaria de cada usuario: si un usuario tiene `America/Costa_Rica`, el sistema evaluará qué fecha es mañana en esa zona antes de buscar sus pendientes. Los usuarios sin zona horaria configurada heredan `America/Santiago`.
+
+Todos los timestamps internos (base de datos, logs) se guardan en **UTC**. Las fechas de los egresos e ingresos (`date`) son fechas locales sin componente horario — se registran tal como el usuario las ingresa.
 
 ---
 

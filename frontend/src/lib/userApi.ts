@@ -170,12 +170,17 @@ export interface MeOut {
   currency: string
   timezone: string
   has_avatar: boolean
+  receive_reminders: boolean
+  reminder_hour: number
+  reminders_globally_enabled: boolean
 }
 
 export interface ProfileUpdatePayload {
   name?: string
   currency?: string
   timezone?: string
+  receive_reminders?: boolean
+  reminder_hour?: number
 }
 
 export interface PasswordChangePayload {
