@@ -1,0 +1,173 @@
+# ==============================================================
+# docker-compose.yml — Entorno PRD
+# Imágenes construidas. Proxy nginx. Sin puertos de debug.
+# Solo el proxy expone puerto al host.
+# ==============================================================
+
+services:
+
+  # ── CORE ────────────────────────────────────────────────────
+
+  proxy:
+    image: nginx:1.26-alpine3.20
+    container_name: ${PROJECT_NAME}-proxy
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${LOGS_ROOT}/nginx:/var/log/nginx
+    networks:
+      - internal
+    ports:
+      - "${PROXY_PORT:-80}:80"
+    depends_on:
+      - backend
+      - frontend
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: core
+      service.lifecycle: stateless
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_NAME}-backend
+    restart: unless-stopped
+    environment:
+      ENV: ${ENV}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
+      MINIO_ENDPOINT: storage:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-receipts}
+      GOTENBERG_URL: http://gotenberg:3000
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: core
+      service.lifecycle: stateless
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    container_name: ${PROJECT_NAME}-frontend
+    restart: unless-stopped
+    networks:
+      - internal
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: core
+      service.lifecycle: stateless
+
+  # ── DEPENDENCY ──────────────────────────────────────────────
+
+  db:
+    image: postgres:16-alpine3.20
+    container_name: ${PROJECT_NAME}-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ${DATA_ROOT}/postgres:/var/lib/postgresql/data
+      - ${LOGS_ROOT}/postgres:/var/log/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: dependency
+      service.lifecycle: persistent
+
+  storage:
+    image: minio/minio:RELEASE.2023-09-07T02-05-02Z
+    container_name: ${PROJECT_NAME}-storage
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - ${DATA_ROOT}/minio:/data
+    networks:
+      - internal
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: dependency
+      service.lifecycle: persistent
+
+  gotenberg:
+    image: gotenberg/gotenberg:8.14.1
+    container_name: ${PROJECT_NAME}-gotenberg
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+    networks:
+      - internal
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: dependency
+      service.lifecycle: stateless
+
+  ocr-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ocr
+    container_name: ${PROJECT_NAME}-ocr-worker
+    restart: unless-stopped
+    environment:
+      ENV: ${ENV}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
+      MINIO_ENDPOINT: storage:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-receipts}
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: dependency
+      service.lifecycle: stateless
+
+# ── Redes ─────────────────────────────────────────────────────
+networks:
+  internal:
+    name: ${PROJECT_NAME}-internal-${ENV}
+    driver: bridge

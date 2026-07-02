@@ -1,0 +1,13 @@
+# ── Desarrollo: Vite dev server con hot-reload ──────────────
+# node_modules se instalan en la imagen y se montan como
+# volumen nombrado para separarlo del bind mount del código.
+FROM node:22-alpine3.20
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

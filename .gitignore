@@ -1,0 +1,63 @@
+# ── Archivos de entorno (secretos) ──────────────────────────
+.env
+.env.dev
+.env.qa
+.env.prd
+
+# Mantener los ejemplos
+!.env.example
+!.env.dev.example
+!.env.qa.example
+!.env.prd.example
+
+# ── Persistencia (datos de runtime) ─────────────────────────
+APP/data/
+APP/logs/
+APP/volumes/
+
+# Mantener la estructura de carpetas
+!APP/data/dev/.gitkeep
+!APP/data/qa/.gitkeep
+!APP/data/prd/.gitkeep
+!APP/logs/dev/.gitkeep
+!APP/logs/qa/.gitkeep
+!APP/logs/prd/.gitkeep
+!APP/volumes/.gitkeep
+
+# ── Backups ──────────────────────────────────────────────────
+docker-backups/*
+!docker-backups/.gitkeep
+*.xlsx
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# ── Node / Frontend ──────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+
+# ── Artefactos de terminal (bat/lsd) ─────────────────────────
+frontend/on
+"frontend/on') as f:"
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
