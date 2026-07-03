@@ -27,6 +27,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET:-receipts}
       GOTENBERG_URL: http://gotenberg:3000
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./backend:/app
     networks:
@@ -36,6 +37,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     labels:
       stack: ${PROJECT_NAME}
       env: ${ENV}
@@ -137,6 +140,18 @@ services:
       - gotenberg
       - --chromium-disable-javascript=true
       - --chromium-allow-list=file:///tmp/.*
+    networks:
+      - internal
+    labels:
+      stack: ${PROJECT_NAME}
+      env: ${ENV}
+      service.group: dependency
+      service.lifecycle: stateless
+
+  redis:
+    image: redis:7.4-alpine3.20
+    container_name: ${PROJECT_NAME}-redis
+    restart: unless-stopped
     networks:
       - internal
     labels:
