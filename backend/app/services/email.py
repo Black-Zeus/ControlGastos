@@ -13,6 +13,7 @@ from email.mime.image import MIMEImage
 from email import encoders
 
 _LOGO_PATH = Path(__file__).parent.parent / "templates" / "email" / "logo-email.png"
+_HERO_ACCESO_PATH = Path(__file__).parent.parent / "templates" / "email" / "hero-acceso.png"
 
 import jinja2
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,24 +75,28 @@ async def _write_log(db: AsyncSession, to_email: str, subject: str, status: str,
 # ─── SMTP raw send ────────────────────────────────────────────────────────────
 
 def _send_raw(cfg: dict, to_email: str, subject: str, body_html: str,
-              attachments: list[tuple[bytes, str, str]] | None = None) -> None:
-    """attachments: list of (bytes, content_type, filename)"""
+              attachments: list[tuple[bytes, str, str]] | None = None,
+              inline_images: dict[str, Path] | None = None) -> None:
+    """attachments: list of (bytes, content_type, filename)
+    inline_images: dict de {cid: ruta_archivo_png} referenciadas en el HTML como cid:<cid>"""
     # Outer envelope: mixed (allows both inline images and file attachments)
     msg = MIMEMultipart('mixed')
     msg['Subject'] = subject
     msg['From'] = cfg['from']
     msg['To'] = to_email
 
-    # related: html body + inline logo via CID
+    # related: html body + imágenes inline vía CID
     related = MIMEMultipart('related')
     related.attach(MIMEText(body_html, 'html', 'utf-8'))
 
-    if _LOGO_PATH.exists():
-        with open(_LOGO_PATH, 'rb') as f:
-            logo = MIMEImage(f.read(), 'png')
-        logo.add_header('Content-ID', '<logo>')
-        logo.add_header('Content-Disposition', 'inline', filename='logo.png')
-        related.attach(logo)
+    all_inline = {'logo': _LOGO_PATH, **(inline_images or {})}
+    for cid, path in all_inline.items():
+        if path.exists():
+            with open(path, 'rb') as f:
+                img = MIMEImage(f.read(), 'png')
+            img.add_header('Content-ID', f'<{cid}>')
+            img.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
+            related.attach(img)
 
     msg.attach(related)
 
@@ -151,7 +156,7 @@ async def send_welcome(db: AsyncSession, *, to_email: str, name: str, setup_toke
     subject, html = _render('welcome.html', name=name, email=to_email,
                             setup_url=setup_url, expires_hours=72)
     try:
-        _send_raw(cfg, to_email, subject, html)
+        _send_raw(cfg, to_email, subject, html, inline_images={'hero-acceso': _HERO_ACCESO_PATH})
         await _write_log(db, to_email, subject, 'ok')
     except Exception as exc:
         await _write_log(db, to_email, subject, 'error', str(exc))
@@ -168,7 +173,7 @@ async def send_password_reset(db: AsyncSession, *, to_email: str, name: str, res
     subject, html = _render('password_reset.html', name=name,
                             reset_url=reset_url, expires_minutes=60)
     try:
-        _send_raw(cfg, to_email, subject, html)
+        _send_raw(cfg, to_email, subject, html, inline_images={'hero-acceso': _HERO_ACCESO_PATH})
         await _write_log(db, to_email, subject, 'ok')
     except Exception as exc:
         await _write_log(db, to_email, subject, 'error', str(exc))

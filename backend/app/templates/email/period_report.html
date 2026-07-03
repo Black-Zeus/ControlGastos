@@ -1,25 +1,41 @@
 {% extends "_base.html" %}
+{% import "_components.html" as c %}
 {% set subject = "Resumen de período " + period_label + " — ControlGastos" %}
-{% block content %}
-<p>Hola <strong>{{ name }}</strong>,</p>
-<p>El período <strong>{{ period_label }}</strong> ha sido cerrado. A continuación el resumen:</p>
+{% set header_label = "Reporte de período" %}
 
-<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px">
+{% block preheader %}Resumen del período {{ period_label }}: ingresos, egresos y balance.{% endblock %}
+
+{% block body %}
+
+{% set title_html %}Hola <span style="color:#4d3ff1;">{{ name }}</span>,{% endset %}
+
+{% set body_html %}
+<p style="margin:0 0 20px 0; font-size:16px; line-height:27px; color:#4d5875;">
+  El período <strong style="color:#17213a;">{{ period_label }}</strong> ha sido cerrado. A continuación el resumen:
+</p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px 0; border-collapse:separate; border-spacing:0 8px;">
   <tr>
-    <td style="padding:10px 14px;background:#f0fdf4;border-radius:8px 0 0 0;color:#374151">Total ingresos</td>
-    <td style="padding:10px 14px;background:#f0fdf4;text-align:right;font-weight:700;color:#059669;border-radius:0 8px 0 0">{{ total_incomes }}</td>
+    <td style="padding:14px 18px; background:#f0fdf4; border-radius:12px; font-size:14px; color:#374151;">Total ingresos</td>
+    <td style="padding:14px 18px; background:#f0fdf4; border-radius:12px; text-align:right; font-weight:700; font-size:14px; color:#059669;">{{ total_incomes }}</td>
   </tr>
   <tr>
-    <td style="padding:10px 14px;background:#fef2f2;color:#374151">Total egresos</td>
-    <td style="padding:10px 14px;background:#fef2f2;text-align:right;font-weight:700;color:#dc2626">{{ total_expenses }}</td>
+    <td style="padding:14px 18px; background:#fef2f2; border-radius:12px; font-size:14px; color:#374151;">Total egresos</td>
+    <td style="padding:14px 18px; background:#fef2f2; border-radius:12px; text-align:right; font-weight:700; font-size:14px; color:#dc2626;">{{ total_expenses }}</td>
   </tr>
   <tr>
-    <td style="padding:10px 14px;background:#eff6ff;border-radius:0 0 0 8px;color:#374151;font-weight:600">Balance</td>
-    <td style="padding:10px 14px;background:#eff6ff;text-align:right;font-weight:700;color:{{ '#059669' if balance_positive else '#dc2626' }};border-radius:0 0 8px 0">{{ balance }}</td>
+    <td style="padding:14px 18px; background:#f7f7ff; border-radius:12px; font-size:14px; font-weight:600; color:#374151;">Balance</td>
+    <td style="padding:14px 18px; background:#f7f7ff; border-radius:12px; text-align:right; font-weight:700; font-size:14px; color:{{ '#059669' if balance_positive else '#dc2626' }};">{{ balance }}</td>
   </tr>
 </table>
 
-<p>El reporte completo en PDF se adjunta a este correo. También puedes descargarlo desde la sección <strong>Períodos</strong> en la aplicación.</p>
-<hr class="divider">
-<p class="muted">Este mensaje fue generado automáticamente al cerrar el período {{ period_label }}.</p>
+<p style="margin:0; font-size:15px; line-height:25px; color:#56617d;">
+  El reporte completo en PDF se adjunta a este correo. También puedes descargarlo desde la sección <strong style="color:#17213a;">Períodos</strong> en la aplicación.
+</p>
+{% endset %}
+
+{{ c.hero_plain(title_html, body_html) }}
+
+{{ c.simple_footer_note("Este mensaje fue generado automáticamente al cerrar el período " + period_label + ".") }}
+
 {% endblock %}

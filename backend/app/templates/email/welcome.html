@@ -1,16 +1,51 @@
 {% extends "_base.html" %}
+{% import "_components.html" as c %}
 {% set subject = "Bienvenido/a a ControlGastos — Activa tu cuenta" %}
-{% block content %}
-<p>Hola <strong>{{ name }}</strong>,</p>
-<p>Se ha creado una cuenta en <strong>ControlGastos</strong> para ti con el correo <strong>{{ email }}</strong>.</p>
-<p>Para acceder por primera vez necesitas crear tu contraseña. Haz clic en el botón a continuación:</p>
-<p style="text-align:center">
-  <a class="btn" href="{{ setup_url }}">Crear mi contraseña</a>
+{% set header_label = "Bienvenida" %}
+
+{% block preheader %}Se creó una cuenta para ti en ControlGastos. Crea tu contraseña para empezar.{% endblock %}
+
+{% block body %}
+
+{% set title_html %}Hola <span style="color:#4d3ff1;">{{ name }}</span>,{% endset %}
+
+{% set body_html %}
+<p style="margin:0 0 20px 0; font-size:16px; line-height:27px; color:#4d5875;">
+  Se ha creado una cuenta en <strong style="color:#17213a;">ControlGastos</strong> para ti con el correo:
 </p>
-<div class="alert">
-  ⏱ Este enlace es válido por <strong>{{ expires_hours }} horas</strong>. Si no lo usas en ese tiempo, contacta al administrador para que lo regenere.
-</div>
-<hr class="divider">
-<p class="muted">Si no esperabas este correo puedes ignorarlo. Nadie podrá acceder a tu cuenta sin crear la contraseña.</p>
-<p class="muted">Si el botón no funciona, copia y pega este enlace en tu navegador:<br><span style="color:#6366f1;word-break:break-all">{{ setup_url }}</span></p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+  <tr>
+    <td style="padding:15px 18px; border:1px solid #dfe3f3; background:#fafbff; border-radius:12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0">
+        <tr>
+          <td valign="middle" style="padding-right:12px;">
+            <div style="width:36px; height:36px; border-radius:50%; background:#ecebff; text-align:center; line-height:36px; color:#4d3ff1; font-size:18px;">✉</div>
+          </td>
+          <td valign="middle" style="font-size:16px; line-height:24px; font-weight:700; color:#17213a;">{{ email }}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 26px 0; font-size:16px; line-height:27px; color:#56617d;">
+  Para acceder por primera vez, necesitas crear tu contraseña.
+</p>
+
+{{ c.cta_button(setup_url, "Crear mi contraseña") }}
+{% endset %}
+
+{{ c.hero_two_col(title_html, body_html, "hero-acceso", "Control financiero") }}
+
+{{ c.notice_box("⏱", "Este enlace es válido por " + expires_hours|string + " horas", "Si no lo usas dentro de ese plazo, contacta al administrador para que lo regenere.", "info") }}
+
+{{ c.divider() }}
+
+{{ c.fallback_footer(
+  "¿No esperabas este correo?",
+  "Puedes ignorarlo. Nadie podrá acceder a tu cuenta sin crear la contraseña.",
+  setup_url
+) }}
+
 {% endblock %}

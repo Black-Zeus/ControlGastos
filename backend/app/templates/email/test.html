@@ -1,9 +1,24 @@
 {% extends "_base.html" %}
+{% import "_components.html" as c %}
 {% set subject = "Email de prueba — ControlGastos" %}
-{% block content %}
-<p>Hola,</p>
-<p>Este es un <strong>email de prueba</strong> enviado desde ControlGastos para verificar que la configuración SMTP funciona correctamente.</p>
-<p>Si recibiste este mensaje, ¡todo está configurado correctamente! ✓</p>
-<hr class="divider">
-<p class="muted">Enviado desde el panel de administración de ControlGastos.</p>
+{% set header_label = "Prueba de configuración" %}
+
+{% block preheader %}Email de prueba para verificar la configuración SMTP de ControlGastos.{% endblock %}
+
+{% block body %}
+
+{% set title_html %}Hola,{% endset %}
+
+{% set body_html %}
+<p style="margin:0 0 8px 0; font-size:16px; line-height:27px; color:#4d5875;">
+  Este es un <strong style="color:#17213a;">email de prueba</strong> enviado desde ControlGastos para verificar que la configuración SMTP funciona correctamente.
+</p>
+{% endset %}
+
+{{ c.hero_plain(title_html, body_html) }}
+
+{{ c.notice_box("✓", "¡Todo está configurado correctamente!", "Si recibiste este mensaje, tu servidor SMTP está listo para enviar correos.", "success") }}
+
+{{ c.simple_footer_note("Enviado desde el panel de administración de ControlGastos.") }}
+
 {% endblock %}

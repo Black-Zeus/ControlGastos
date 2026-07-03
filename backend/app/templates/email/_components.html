@@ -1,0 +1,218 @@
+{# Componentes reutilizables para los templates de email. Solo se importa, no se renderiza directo. #}
+
+{% macro header(label) %}
+<tr>
+  <td class="content-padding" style="
+    padding:34px 44px;
+    background-color:#312fd0;
+    background-image:
+      radial-gradient(circle at top right, rgba(124, 92, 255, 0.85), transparent 34%),
+      linear-gradient(135deg, #2526a8 0%, #4d3ff1 52%, #6557ff 100%);
+  ">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="left" valign="middle">
+          <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr>
+              <td valign="middle" style="padding-right:14px;">
+                <div style="width:54px; height:54px; border-radius:16px; background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.28); text-align:center; line-height:54px;">
+                  <img src="cid:logo" width="34" height="34" alt="ControlGastos" style="display:inline-block; vertical-align:middle; border:0;" />
+                </div>
+              </td>
+              <td valign="middle">
+                <div style="font-size:23px; line-height:30px; font-weight:700; color:#ffffff; letter-spacing:-0.4px;">ControlGastos</div>
+                <div style="font-size:12px; line-height:18px; color:rgba(255,255,255,0.72);">Control financiero personal y domiciliario</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td align="right" valign="middle" style="font-size:12px; color:rgba(255,255,255,0.72);">{{ label }}</td>
+      </tr>
+    </table>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro hero_two_col(title_html, body_html, image_cid, image_alt) %}
+<tr>
+  <td class="content-padding" style="padding:46px 44px 26px 44px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="stack-column" width="55%" valign="top" style="width:55%;">
+          <h1 class="hero-title" style="margin:0 0 22px 0; font-size:34px; line-height:42px; font-weight:800; letter-spacing:-1.1px; color:#17213a;">
+            {{ title_html }}
+          </h1>
+          {{ body_html }}
+        </td>
+        <td class="stack-column hero-image" width="45%" valign="middle" align="right" style="width:45%; padding-left:24px;">
+          <img src="cid:{{ image_cid }}" width="220" alt="{{ image_alt }}" style="display:block; width:220px; max-width:100%; border:0;" />
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro hero_plain(title_html, body_html) %}
+<tr>
+  <td class="content-padding" style="padding:46px 44px 26px 44px;">
+    <h1 class="hero-title" style="margin:0 0 22px 0; font-size:34px; line-height:42px; font-weight:800; letter-spacing:-1.1px; color:#17213a;">
+      {{ title_html }}
+    </h1>
+    {{ body_html }}
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro cta_button(url, text, icon='🔒') %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 0 0;">
+  <tr>
+    <td>
+      <a href="{{ url }}" class="cta-button" style="
+        display:inline-block;
+        min-width:260px;
+        padding:17px 28px;
+        border-radius:13px;
+        background-color:#4d3ff1;
+        background-image:linear-gradient(135deg, #342fe3 0%, #6557ff 100%);
+        color:#ffffff;
+        font-size:17px;
+        line-height:22px;
+        font-weight:700;
+        text-decoration:none;
+        box-shadow:0 12px 24px rgba(77, 63, 241, 0.28);
+        text-align:center;
+      ">
+        {{ icon }}&nbsp;&nbsp;{{ text }}&nbsp;&nbsp;→
+      </a>
+    </td>
+  </tr>
+</table>
+{% endmacro %}
+
+
+{% macro notice_box(icon, title_html, body_html, variant='info') %}
+{% set palette = {
+  'info':    {'border': '#cfd3ff', 'bg': '#f7f7ff', 'icon_bg': '#e8e7ff', 'icon_color': '#4d3ff1', 'title_color': '#312fd0'},
+  'warning': {'border': '#fbbf24', 'bg': '#fef3c7', 'icon_bg': '#fde68a', 'icon_color': '#92400e', 'title_color': '#92400e'},
+  'success': {'border': '#6ee7b7', 'bg': '#d1fae5', 'icon_bg': '#a7f3d0', 'icon_color': '#065f46', 'title_color': '#065f46'},
+  'danger':  {'border': '#fca5a5', 'bg': '#fef2f2', 'icon_bg': '#fecaca', 'icon_color': '#991b1b', 'title_color': '#991b1b'},
+} %}
+{% set p = palette[variant] %}
+<tr>
+  <td class="content-padding" style="padding:4px 44px 10px 44px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{ p.border }}; background:{{ p.bg }}; border-radius:14px;">
+      <tr>
+        <td style="padding:20px 22px;">
+          <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr>
+              <td valign="top" style="padding-right:16px;">
+                <div style="width:46px; height:46px; border-radius:50%; background:{{ p.icon_bg }}; text-align:center; line-height:46px; color:{{ p.icon_color }}; font-size:21px;">
+                  {{ icon }}
+                </div>
+              </td>
+              <td valign="top">
+                <div style="font-size:16px; line-height:24px; font-weight:700; color:{{ p.title_color }};">
+                  {{ title_html }}
+                </div>
+                <div style="margin-top:4px; font-size:14px; line-height:22px; color:#56617d;">
+                  {{ body_html }}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro divider() %}
+<tr>
+  <td class="content-padding" style="padding:0 44px;">
+    <div style="height:1px; background:#e7eaf4; line-height:1px; font-size:1px;">&nbsp;</div>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro fallback_footer(help_title, help_body, url) %}
+<tr>
+  <td class="content-padding" style="padding:30px 44px 34px 44px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="footer-columns" width="48%" valign="top" style="width:48%; padding-right:22px;">
+          <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr>
+              <td valign="top" style="padding-right:14px;">
+                <div style="width:44px; height:44px; border-radius:50%; background:#f0efff; text-align:center; line-height:44px; color:#4d3ff1; font-size:22px;">?</div>
+              </td>
+              <td valign="top">
+                <div style="font-size:16px; line-height:23px; font-weight:700; color:#17213a; margin-bottom:8px;">{{ help_title }}</div>
+                <div style="font-size:14px; line-height:23px; color:#66708e;">{{ help_body }}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class="footer-columns fallback-box" width="52%" valign="top" style="width:52%; border-left:1px solid #dfe3f0; padding-left:28px;">
+          <div style="font-size:14px; line-height:22px; color:#66708e; margin-bottom:12px;">
+            Si el botón no funciona, copia y pega este enlace en tu navegador:
+          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafbff; border:1px solid #dfe3f3; border-radius:12px;">
+            <tr>
+              <td style="padding:14px 16px;">
+                <div style="font-size:13px; line-height:20px; color:#3145d4; word-break:break-all;">{{ url }}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro simple_footer_note(text) %}
+<tr>
+  <td class="content-padding" style="padding:30px 44px 34px 44px;">
+    <div style="font-size:14px; line-height:23px; color:#66708e;">{{ text }}</div>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro trust_band() %}
+<tr>
+  <td style="background:#f5f6fc; border-top:1px solid #e7eaf4; padding:26px 44px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td valign="middle" style="width:48px; padding-right:16px;">
+          <div style="width:44px; height:44px; border-radius:14px; border:1px solid #d6dbea; text-align:center; line-height:44px; color:#8a94ad; font-size:23px;">🛡</div>
+        </td>
+        <td valign="middle">
+          <div style="font-size:15px; line-height:22px; font-weight:700; color:#313b5b;">Tu seguridad es nuestra prioridad</div>
+          <div style="font-size:13px; line-height:20px; color:#7a849f;">Si tienes dudas, contacta al administrador de ControlGastos.</div>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+{% endmacro %}
+
+
+{% macro footer_legal() %}
+<tr>
+  <td style="padding:22px 34px 26px 34px; background:#ffffff; text-align:center;">
+    <div style="font-size:12px; line-height:19px; color:#9aa3b8;">
+      Este mensaje fue generado automáticamente por ControlGastos.<br />
+      <strong style="color:#7d879e;">Por favor no respondas a este correo.</strong>
+    </div>
+  </td>
+</tr>
+{% endmacro %}

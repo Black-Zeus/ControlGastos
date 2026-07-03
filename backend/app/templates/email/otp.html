@@ -1,14 +1,32 @@
 {% extends "_base.html" %}
+{% import "_components.html" as c %}
 {% set subject = "Tu código de verificación — ControlGastos" %}
-{% block content %}
-<p>Hola <strong>{{ name }}</strong>,</p>
-<p>Tu código de verificación de un solo uso (OTP) es:</p>
-<p style="text-align:center;margin:24px 0">
-  <span style="display:inline-block;font-size:36px;font-weight:700;letter-spacing:12px;color:#6366f1;background:#eef2ff;padding:16px 28px;border-radius:12px;font-family:monospace">{{ otp_code }}</span>
+{% set header_label = "Verificación en dos pasos" %}
+
+{% block preheader %}Tu código de verificación de un solo uso para ControlGastos.{% endblock %}
+
+{% block body %}
+
+{% set title_html %}Hola <span style="color:#4d3ff1;">{{ name }}</span>,{% endset %}
+
+{% set body_html %}
+<p style="margin:0 0 8px 0; font-size:16px; line-height:27px; color:#4d5875;">
+  Tu código de verificación de un solo uso es:
 </p>
-<div class="alert">
-  ⏱ Este código es válido por <strong>{{ expires_minutes }} minutos</strong> y solo puede usarse una vez.
-</div>
-<hr class="divider">
-<p class="muted">Si no solicitaste este código, ignora este mensaje. Nadie más puede usarlo sin conocer tu contraseña.</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 26px 0;">
+  <tr>
+    <td style="padding:18px 32px; background:#f7f7ff; border:1px solid #cfd3ff; border-radius:14px;">
+      <span style="display:inline-block; font-size:34px; font-weight:800; letter-spacing:10px; color:#4d3ff1; font-family:'Courier New', monospace;">{{ otp_code }}</span>
+    </td>
+  </tr>
+</table>
+{% endset %}
+
+{{ c.hero_plain(title_html, body_html) }}
+
+{{ c.notice_box("⏱", "Este código es válido por " + expires_minutes|string + " minutos", "Solo puede usarse una vez. Si no solicitaste este código, ignora este mensaje — nadie más puede usarlo sin conocer tu contraseña.", "info") }}
+
+{{ c.simple_footer_note("Este código fue solicitado desde tu cuenta de ControlGastos. Si no reconoces esta actividad, contacta al administrador del sistema.") }}
+
 {% endblock %}
