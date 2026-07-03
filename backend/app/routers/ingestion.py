@@ -5,7 +5,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -89,11 +89,15 @@ async def revoke_token(
 
 # ─── Endpoint público de ingesta (autenticado por token) ─────────────────────
 
+def _extract_ingestion_token(request: Request) -> str:
+    return request.headers.get("Authorization", "").removeprefix("Bearer ")
+
+
 @router.post("/ingestion/receipts", status_code=status.HTTP_201_CREATED)
 async def ingest_receipt(
     file: UploadFile = File(...),
     note: str | None = Form(default=None),
-    x_ingestion_token: str = Depends(lambda req: req.headers.get("Authorization", "").removeprefix("Bearer ")),
+    x_ingestion_token: str = Depends(_extract_ingestion_token),
     db: AsyncSession = Depends(get_db),
 ):
     """

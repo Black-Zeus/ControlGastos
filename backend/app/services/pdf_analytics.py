@@ -7,7 +7,7 @@ import math
 from datetime import datetime
 from typing import Any
 
-from app.services.pdf_report import _fmt, _e, _PALETTE, generate_pdf  # noqa: F401
+from app.services.pdf_report import _fmt, _e, _sanitize_svg, _PALETTE, generate_pdf  # noqa: F401
 
 # ─── Helpers compartidos ──────────────────────────────────────────────────────
 
@@ -265,6 +265,7 @@ def build_comparacion_html(
 </table>"""
 
     # ── Gráfico categorías ──
+    chart_svg = _sanitize_svg(chart_svg) if chart_svg else ''
     if chart_svg:
         chart_content = chart_svg
     else:
@@ -346,6 +347,7 @@ def build_tendencia_html(
     kpi_block = f'<table style="border-collapse:separate;border-spacing:10px 0;margin-bottom:8px;width:100%"><tr>{kpi_cells}</tr></table>'
 
     # ── Gráfico ──
+    chart_svg = _sanitize_svg(chart_svg) if chart_svg else ''
     if chart_svg:
         chart_content = chart_svg
     else:
@@ -436,6 +438,7 @@ def build_categorias_html(
     cover = _build_cover(user_name, 'Evolución por categoría', mode_label, avatar_b64, avatar_mime)
 
     # ── Gráfico multi-línea ──
+    chart_svg = _sanitize_svg(chart_svg) if chart_svg else ''
     if chart_svg:
         chart_content = chart_svg
     else:

@@ -6,6 +6,7 @@ Página 2+: egresos.
 """
 import html as _html
 import math
+import re
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
@@ -41,6 +42,34 @@ def _fmt(amount: Decimal | float | None, currency: str) -> str:
 
 def _e(s: Any) -> str:
     return _html.escape(str(s)) if s is not None else ''
+
+
+_SVG_DANGEROUS_TAGS = re.compile(
+    r'<\s*(script|foreignObject|iframe|image|use|object|embed|link|style)\b[^>]*>.*?<\s*/\s*\1\s*>'
+    r'|<\s*(script|foreignObject|iframe|image|use|object|embed|link|style)\b[^>]*/?>',
+    re.IGNORECASE | re.DOTALL,
+)
+_SVG_EVENT_ATTR = re.compile(r'\son[a-zA-Z]+\s*=\s*(".*?"|\'.*?\')', re.IGNORECASE | re.DOTALL)
+_SVG_URL_ATTR = re.compile(r'\s(?:href|xlink:href|src)\s*=\s*(".*?"|\'.*?\')', re.IGNORECASE | re.DOTALL)
+
+
+def _sanitize_svg(svg: Any) -> str:
+    """
+    Sanitiza un SVG provisto por el cliente (extraído del DOM del gráfico
+    renderizado en el navegador) antes de incrustarlo en el HTML que Gotenberg
+    convierte a PDF. Quita vectores de SSRF/XSS — tags que cargan recursos
+    externos, handlers de eventos, referencias href/src — sin descartar el
+    gráfico completo. Si el contenido no parece un SVG válido, se descarta.
+    """
+    if not isinstance(svg, str):
+        return ''
+    s = svg.strip()
+    if not s.lower().startswith('<svg') or len(s) > 200_000:
+        return ''
+    s = _SVG_DANGEROUS_TAGS.sub('', s)
+    s = _SVG_EVENT_ATTR.sub('', s)
+    s = _SVG_URL_ATTR.sub('', s)
+    return s
 
 
 def _ps_val(obj, field: str, fallback: str = '') -> str:
