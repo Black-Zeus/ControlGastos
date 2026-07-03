@@ -4,7 +4,7 @@ import {
   LayoutDashboard, TrendingDown, TrendingUp,
   Tags, CalendarRange, X, ChevronRight,
   LogOut, UserCircle,
-  ArrowLeftRight, Activity, PieChart,
+  ArrowLeftRight, Activity, PieChart, HelpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -48,6 +48,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Períodos',  icon: CalendarRange, path: '/periodos' },
       { label: 'Catálogos', icon: Tags,          path: '/catalogos' },
+    ],
+  },
+  {
+    label: 'Ayuda',
+    items: [
+      { label: 'Centro de ayuda', icon: HelpCircle, path: '/ayuda' },
     ],
   },
 ]
