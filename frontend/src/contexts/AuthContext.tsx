@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useUserStore, type UserProfile } from '@/stores/userStore'
 import { SessionExpiryModal } from '@/components/SessionExpiryModal'
+import { setAuthToken } from '@/lib/userApi'
 
 export type AuthUser = UserProfile
 
@@ -8,7 +9,7 @@ interface AuthContextValue {
   user: AuthUser | null
   token: string | null
   isLoading: boolean
-  login: (token: string, refresh: string) => Promise<AuthUser>
+  login: (accessToken: string) => Promise<AuthUser>
   logout: () => void
   updateUser: (partial: Partial<AuthUser>) => void
   refreshMe: () => Promise<void>
@@ -16,9 +17,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const ACCESS_KEY  = 'cg_access'
-const REFRESH_KEY = 'cg_refresh'
-const API_BASE    = import.meta.env.VITE_API_BASE_URL ?? ''
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 function getTokenExp(token: string): number | null {
   try {
@@ -53,78 +52,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = useCallback(async (accessToken: string): Promise<AuthUser> => {
     const res = await fetch(`${API_BASE}/v1/auth/me`, {
+      credentials: 'include',
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!res.ok) throw new Error('Token inválido')
     return res.json() as Promise<AuthUser>
   }, [])
 
-  // Restaurar sesión al cargar
-  useEffect(() => {
-    const stored = localStorage.getItem(ACCESS_KEY)
-    if (!stored) { setIsLoading(false); return }
+  const applyToken = useCallback((accessToken: string) => {
+    setAuthToken(accessToken)
+    setToken(accessToken)
+    scheduleWarning(accessToken)
+  }, [scheduleWarning])
 
-    fetchMe(stored)
-      .then(me => {
-        setToken(stored)
+  // Restaurar sesión al cargar: el access token vive solo en memoria (no
+  // sobrevive un refresh de página), así que se intenta renovar en
+  // silencio usando la cookie httpOnly de refresh, si existe.
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/auth/refresh`, { method: 'POST', credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) throw new Error('Sin sesión activa')
+        const { access_token } = await res.json()
+        const me = await fetchMe(access_token)
+        applyToken(access_token)
         setProfile(me)
-        scheduleWarning(stored)
       })
       .catch(() => {
-        localStorage.removeItem(ACCESS_KEY)
-        localStorage.removeItem(REFRESH_KEY)
         clearProfile()
       })
       .finally(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const login = useCallback(async (accessToken: string, refreshToken: string): Promise<AuthUser> => {
-    localStorage.setItem(ACCESS_KEY, accessToken)
-    localStorage.setItem(REFRESH_KEY, refreshToken)
+  const login = useCallback(async (accessToken: string): Promise<AuthUser> => {
     const me = await fetchMe(accessToken)
-    setToken(accessToken)
+    applyToken(accessToken)
     setProfile(me)
-    scheduleWarning(accessToken)
     return me
-  }, [fetchMe, setProfile, scheduleWarning])
+  }, [fetchMe, setProfile, applyToken])
 
   const logout = useCallback(() => {
     clearTimer()
     setShowExpiry(false)
-    localStorage.removeItem(ACCESS_KEY)
-    localStorage.removeItem(REFRESH_KEY)
+    setAuthToken('')
     setToken(null)
     clearProfile()
+    fetch(`${API_BASE}/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
   }, [clearProfile, clearTimer])
 
   const renewSession = useCallback(async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY)
-    if (!refreshToken) { logout(); return }
-    const res = await fetch(`${API_BASE}/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
+    const res = await fetch(`${API_BASE}/v1/auth/refresh`, { method: 'POST', credentials: 'include' })
     if (!res.ok) { logout(); return }
-    const { access_token, refresh_token } = await res.json()
-    localStorage.setItem(ACCESS_KEY, access_token)
-    localStorage.setItem(REFRESH_KEY, refresh_token)
-    setToken(access_token)
+    const { access_token } = await res.json()
+    applyToken(access_token)
     setShowExpiry(false)
-    scheduleWarning(access_token)
-  }, [logout, scheduleWarning])
+  }, [logout, applyToken])
 
   const updateUser = useCallback((partial: Partial<AuthUser>) => {
     updateProfile(partial)
   }, [updateProfile])
 
   const refreshMe = useCallback(async () => {
-    const stored = localStorage.getItem(ACCESS_KEY)
-    if (!stored) return
-    const me = await fetchMe(stored)
+    if (!token) return
+    const me = await fetchMe(token)
     setProfile(me)
-  }, [fetchMe, setProfile])
+  }, [fetchMe, setProfile, token])
 
   return (
     <AuthContext.Provider value={{ user: profile, token, isLoading, login, logout, updateUser, refreshMe }}>

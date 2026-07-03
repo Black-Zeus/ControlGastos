@@ -22,6 +22,7 @@ export function LoginPage() {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/v1/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
@@ -29,8 +30,8 @@ export function LoginPage() {
         const data = await res.json()
         throw new Error(data.detail ?? 'Error al iniciar sesión')
       }
-      const { access_token, refresh_token } = await res.json()
-      await login(access_token, refresh_token)
+      const { access_token } = await res.json()
+      await login(access_token)
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado')

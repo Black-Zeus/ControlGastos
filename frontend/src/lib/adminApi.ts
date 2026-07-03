@@ -1,12 +1,21 @@
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
+// El access token vive solo en memoria (lo fija AdminAuthContext tras login/refresh),
+// nunca en localStorage — así una regresión XSS no puede robarlo del storage.
+let _authToken = ''
+
+export function setAuthToken(t: string) {
+  _authToken = t
+}
+
 function token() {
-  return localStorage.getItem('cg_admin_access') ?? ''
+  return _authToken
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token()}`,

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { SessionExpiryModal } from '@/components/SessionExpiryModal'
+import { setAuthToken } from '@/lib/adminApi'
 
 interface AdminUser {
   id: string
@@ -15,16 +16,14 @@ interface AdminAuthContextValue {
   token: string | null
   isLoading: boolean
   mustChangePwd: boolean
-  login: (token: string, refresh: string) => Promise<AdminUser>
+  login: (accessToken: string) => Promise<AdminUser>
   logout: () => void
   clearMustChangePwd: () => void
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
-const ACCESS_KEY  = 'cg_admin_access'
-const REFRESH_KEY = 'cg_admin_refresh'
-const API_BASE    = import.meta.env.VITE_API_BASE_URL ?? ''
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 function getTokenExp(token: string): number | null {
   try {
@@ -59,6 +58,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = useCallback(async (accessToken: string): Promise<AdminUser> => {
     const res = await fetch(`${API_BASE}/v1/auth/me`, {
+      credentials: 'include',
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!res.ok) throw new Error('Token inválido')
@@ -67,64 +67,58 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     return me as AdminUser
   }, [])
 
-  useEffect(() => {
-    const stored = localStorage.getItem(ACCESS_KEY)
-    if (!stored) { setIsLoading(false); return }
+  const applyToken = useCallback((accessToken: string) => {
+    setAuthToken(accessToken)
+    setToken(accessToken)
+    scheduleWarning(accessToken)
+  }, [scheduleWarning])
 
-    fetchMe(stored)
-      .then(me => {
-        setToken(stored)
+  // Restaurar sesión al cargar usando la cookie httpOnly de refresh de admin
+  // (separada de la de usuario regular — ver ADMIN_REFRESH_COOKIE_NAME en el backend).
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/admin/refresh`, { method: 'POST', credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) throw new Error('Sin sesión activa')
+        const { access_token } = await res.json()
+        const me = await fetchMe(access_token)
+        applyToken(access_token)
         setAdmin(me)
         setMustChangePwd(me.must_change_password ?? false)
-        scheduleWarning(stored)
       })
       .catch(() => {
-        localStorage.removeItem(ACCESS_KEY)
-        localStorage.removeItem(REFRESH_KEY)
+        // No hay sesión de admin activa (o la cookie pertenece a un usuario no-admin)
       })
       .finally(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const login = useCallback(async (accessToken: string, refreshToken: string): Promise<AdminUser> => {
-    localStorage.setItem(ACCESS_KEY, accessToken)
-    localStorage.setItem(REFRESH_KEY, refreshToken)
+  const login = useCallback(async (accessToken: string): Promise<AdminUser> => {
     const me = await fetchMe(accessToken)
-    setToken(accessToken)
+    applyToken(accessToken)
     setAdmin(me)
     setMustChangePwd(me.must_change_password ?? false)
-    scheduleWarning(accessToken)
     return me
-  }, [fetchMe, scheduleWarning])
+  }, [fetchMe, applyToken])
 
   const clearMustChangePwd = useCallback(() => setMustChangePwd(false), [])
 
   const logout = useCallback(() => {
     clearTimer()
     setShowExpiry(false)
-    localStorage.removeItem(ACCESS_KEY)
-    localStorage.removeItem(REFRESH_KEY)
+    setAuthToken('')
     setToken(null)
     setAdmin(null)
     setMustChangePwd(false)
+    fetch(`${API_BASE}/v1/admin/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
   }, [clearTimer])
 
   const renewSession = useCallback(async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY)
-    if (!refreshToken) { logout(); return }
-    const res = await fetch(`${API_BASE}/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
+    const res = await fetch(`${API_BASE}/v1/admin/refresh`, { method: 'POST', credentials: 'include' })
     if (!res.ok) { logout(); return }
-    const { access_token, refresh_token } = await res.json()
-    localStorage.setItem(ACCESS_KEY, access_token)
-    localStorage.setItem(REFRESH_KEY, refresh_token)
-    setToken(access_token)
+    const { access_token } = await res.json()
+    applyToken(access_token)
     setShowExpiry(false)
-    scheduleWarning(access_token)
-  }, [logout, scheduleWarning])
+  }, [logout, applyToken])
 
   return (
     <AdminAuthContext.Provider value={{ admin, token, isLoading, mustChangePwd, login, logout, clearMustChangePwd }}>

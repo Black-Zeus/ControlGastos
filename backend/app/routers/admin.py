@@ -12,13 +12,14 @@ import uuid
 import hashlib
 import secrets
 from datetime import datetime, timedelta
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.auth.dependencies import get_current_admin
 from app.auth.rate_limit import rate_limit
 from app.database import get_db
+from app.routers.auth import _set_refresh_cookie
 from app.models.user import User
 from app.models.catalog import Category, IncomeType
 from app.models.ingestion import IngestionToken
@@ -26,13 +27,19 @@ from app.models.period import Period, PeriodStatus
 from app.models.settings import AppSetting
 from app.models.email_log import EmailLog
 from app.models.password_reset import PasswordResetToken, TokenType
-from app.auth.jwt import hash_password, verify_password, create_access_token, create_refresh_token
+from app.auth.jwt import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.services import email as email_service
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _admin_login_limit = rate_limit(max_calls=5, window_seconds=60)
+
+# Cookie de refresh separada de la de usuario regular — evita que iniciar
+# sesión en el panel admin invalide silenciosamente la sesión de usuario
+# (y viceversa) cuando ambas se usan en el mismo navegador.
+ADMIN_REFRESH_COOKIE_NAME = "cg_admin_refresh"
+ADMIN_REFRESH_COOKIE_PATH = "/api/v1/admin"
 
 
 # ─── Auth de administrador ────────────────────────────────────────────────────
@@ -43,7 +50,6 @@ class AdminLoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     must_change_password: bool = False
 
@@ -51,7 +57,7 @@ _BOOTSTRAP_PASSWORD = "admin"
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(_admin_login_limit)])
-async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)):
+async def admin_login(body: AdminLoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     # Modo bootstrap: si no existe ningún administrador, se permite crear el primero
     # con cualquier email y la contraseña "admin", forzando cambio inmediato.
     admin_count = (await db.execute(
@@ -85,11 +91,51 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db
     user.last_login_at = datetime.utcnow()
     await db.commit()
 
+    _set_refresh_cookie(
+        response, create_refresh_token(user.id, user.token_version),
+        cookie_name=ADMIN_REFRESH_COOKIE_NAME, path=ADMIN_REFRESH_COOKIE_PATH,
+    )
     return TokenResponse(
         access_token=create_access_token(user.id, user.token_version),
-        refresh_token=create_refresh_token(user.id, user.token_version),
         must_change_password=getattr(user, 'must_change_password', False),
     )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def admin_refresh(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    cg_admin_refresh: str | None = Cookie(default=None),
+):
+    from jose import JWTError
+    try:
+        payload = decode_token(cg_admin_refresh or "")
+        if payload.get("type") != "refresh":
+            raise ValueError
+        user_id = uuid.UUID(payload["sub"])
+        token_ver = payload.get("ver")
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
+
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user or not user.is_active or not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no válido")
+    if token_ver is None or token_ver != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesión expirada. Inicia sesión nuevamente.")
+
+    _set_refresh_cookie(
+        response, create_refresh_token(user.id, user.token_version),
+        cookie_name=ADMIN_REFRESH_COOKIE_NAME, path=ADMIN_REFRESH_COOKIE_PATH,
+    )
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.token_version),
+        must_change_password=getattr(user, 'must_change_password', False),
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_logout(response: Response):
+    response.delete_cookie(key=ADMIN_REFRESH_COOKIE_NAME, path=ADMIN_REFRESH_COOKIE_PATH)
 
 
 # ─── Schemas inline (mínimos para el admin) ──────────────────────────────────
