@@ -473,6 +473,7 @@ function PasswordForm() {
   const [showNew, setShowNew] = useState(false)
   const [saving, setSaving]   = useState(false)
   const { toast, show } = useToast()
+  const { login } = useAuth()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -480,7 +481,8 @@ function PasswordForm() {
     if (next.length < 8) { show('Mínimo 8 caracteres', 'err'); return }
     setSaving(true)
     try {
-      await userApi.profile.changePassword({ current_password: cur, new_password: next })
+      const { access_token } = await userApi.profile.changePassword({ current_password: cur, new_password: next })
+      await login(access_token)
       setCur(''); setNext(''); setConf('')
       show('Contraseña actualizada')
     } catch (err) { show(err instanceof Error ? err.message : 'Error', 'err') }

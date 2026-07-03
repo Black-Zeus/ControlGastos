@@ -4,21 +4,23 @@ Perfil del usuario autenticado — /api/v1/me
 import asyncio
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Cookie, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user
-from app.auth.jwt import hash_password, verify_password
+from app.auth.jwt import create_access_token, create_refresh_token, hash_password, verify_password
 from app.database import get_db
 from app.models.user import User
-from app.routers.auth import MeOut, _reminders_globally_enabled
+from app.routers.admin import ADMIN_REFRESH_COOKIE_NAME, ADMIN_REFRESH_COOKIE_PATH
+from app.routers.auth import MeOut, _reminders_globally_enabled, _set_refresh_cookie
 from app.services import email as email_service
 
 router = APIRouter(prefix="/me", tags=["profile"])
 
 AVATAR_MIME = {"image/jpeg", "image/png", "image/webp"}
+AVATAR_EXT_BY_MIME = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
@@ -33,6 +35,10 @@ class ProfileUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+
+class PasswordChangeResponse(BaseModel):
+    access_token: str
 
 
 class AddTagPayload(BaseModel):
@@ -83,11 +89,13 @@ async def update_me(
     return MeOut.from_user(current_user, reminders_globally_enabled=globally_enabled)
 
 
-@router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/password", response_model=PasswordChangeResponse)
 async def change_password(
     body: PasswordChange,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    cg_refresh: str | None = Cookie(default=None),
 ):
     if not verify_password(body.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
@@ -104,6 +112,24 @@ async def change_password(
         db, to_email=current_user.email, name=current_user.name, by_admin=False
     )
 
+    # El cambio de password sube token_version e invalida todas las sesiones
+    # existentes (incluida la que hace esta misma petición) — reemitimos
+    # credenciales para que la sesión actual siga funcionando en vez de
+    # quedar con un token fantasma. La cookie de refresh de admin está
+    # scoped a /api/v1/admin, así que nunca llega a esta ruta (/api/v1/me) —
+    # por eso se decide por rol y no por la cookie recibida.
+    if current_user.is_admin:
+        _set_refresh_cookie(
+            response, create_refresh_token(current_user.id, current_user.token_version),
+            cookie_name=ADMIN_REFRESH_COOKIE_NAME, path=ADMIN_REFRESH_COOKIE_PATH,
+        )
+    if cg_refresh is not None:
+        _set_refresh_cookie(response, create_refresh_token(current_user.id, current_user.token_version))
+
+    return PasswordChangeResponse(
+        access_token=create_access_token(current_user.id, current_user.token_version)
+    )
+
 
 @router.post("/avatar", response_model=MeOut, status_code=status.HTTP_200_OK)
 async def upload_avatar(
@@ -118,7 +144,7 @@ async def upload_avatar(
     if len(content) > AVATAR_MAX_BYTES:
         raise HTTPException(status_code=400, detail="El avatar supera el límite de 5 MB")
 
-    ext = file.filename.rsplit('.', 1)[-1].lower() if file.filename else 'jpg'
+    ext = AVATAR_EXT_BY_MIME[file.content_type]
     new_key = f"avatars/{current_user.id}/{uuid.uuid4()}.{ext}"
 
     from app import storage

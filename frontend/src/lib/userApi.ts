@@ -287,7 +287,7 @@ export const userApi = {
   profile: {
     get:            ()                                          => request<MeOut>('/v1/me'),
     update:         (body: ProfileUpdatePayload)                => request<MeOut>('/v1/me', { method: 'PATCH', body: JSON.stringify(body) }),
-    changePassword: (body: PasswordChangePayload)               => request<void>('/v1/me/password', { method: 'PATCH', body: JSON.stringify(body) }),
+    changePassword: (body: PasswordChangePayload)               => request<{ access_token: string }>('/v1/me/password', { method: 'PATCH', body: JSON.stringify(body) }),
     uploadAvatar:   (file: File)                                => {
       const fd = new FormData()
       fd.append('file', file)

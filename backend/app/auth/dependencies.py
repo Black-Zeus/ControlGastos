@@ -26,11 +26,14 @@ async def _get_user_from_token(
         if payload.get("type") != "access":
             raise credentials_exc
         user_id = uuid.UUID(payload["sub"])
+        token_ver = payload.get("ver")
     except (JWTError, ValueError):
         raise credentials_exc
 
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user or not user.is_active:
+        raise credentials_exc
+    if token_ver is None or token_ver != user.token_version:
         raise credentials_exc
     return user
 

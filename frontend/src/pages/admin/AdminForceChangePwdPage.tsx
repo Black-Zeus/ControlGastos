@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export function AdminForceChangePwdPage() {
-  const { token, logout, clearMustChangePwd } = useAdminAuth()
+  const { token, logout, login } = useAdminAuth()
   const navigate = useNavigate()
 
   const [current,  setCurrent]  = useState('')
@@ -44,11 +44,11 @@ export function AdminForceChangePwdPage() {
         },
         body: JSON.stringify({ current_password: current, new_password: next }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         throw new Error(data.detail ?? 'Error al cambiar la contraseña')
       }
-      clearMustChangePwd()
+      await login(data.access_token)
       navigate('/admin', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado')
