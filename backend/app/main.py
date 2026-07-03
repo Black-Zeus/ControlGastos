@@ -14,7 +14,6 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings.warn_insecure_defaults()
     async with AsyncSessionLocal() as db:
         await seed_system_catalogs(db)
     yield
