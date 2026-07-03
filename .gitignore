@@ -10,6 +10,7 @@
 # ── Persistencia (datos de runtime) ─────────────────────────
 APP/logs/
 APP/volumes/
+trash/
 
 # Mantener la estructura de carpetas
 !APP/logs/dev/.gitkeep

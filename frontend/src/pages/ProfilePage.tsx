@@ -634,65 +634,64 @@ function NotificationsForm() {
           </div>
         )}
 
-        <p className="text-xs text-gray-500 dark:text-slate-400">
-          Cuando está activo, recibirás un email el día anterior a cada egreso o ingreso con estado <strong>pendiente</strong>, con todos tus compromisos del día siguiente agrupados.
-        </p>
-
-        {/* Toggle activar/desactivar */}
-        <label className={cn(
-          'flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-colors',
-          globallyEnabled
-            ? 'border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-            : 'border-gray-100 dark:border-slate-800 opacity-60',
+        {/* Activar + hora, uno al lado del otro para no ocupar tanta pantalla */}
+        <div className={cn(
+          'flex flex-wrap items-center justify-center gap-x-10 gap-y-3 rounded-xl border p-4 transition-colors',
+          globallyEnabled ? 'border-gray-100 dark:border-slate-800' : 'border-gray-100 dark:border-slate-800 opacity-60',
         )}>
-          <div className="relative mt-0.5 shrink-0">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={e => setEnabled(e.target.checked)}
-              className="sr-only"
-            />
-            <div className={cn(
-              'h-5 w-9 rounded-full transition-colors',
-              enabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-slate-700',
-            )} />
-            <div className={cn(
-              'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
-              enabled ? 'translate-x-4' : 'translate-x-0.5',
-            )} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-slate-200">
-              {enabled
-                ? <><Bell size={14} className="text-primary-500" /> Recordatorios activados</>
-                : <><BellOff size={14} className="text-gray-400" /> Recordatorios desactivados</>
-              }
+          {/* Toggle activar/desactivar */}
+          <label className="flex shrink-0 cursor-pointer items-center gap-3">
+            <div className="relative shrink-0">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={e => setEnabled(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={cn(
+                'h-5 w-9 rounded-full transition-colors',
+                enabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-slate-700',
+              )} />
+              <div className={cn(
+                'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
+                enabled ? 'translate-x-4' : 'translate-x-0.5',
+              )} />
             </div>
-            <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+            <span className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-slate-200">
               {enabled
-                ? 'Recibirás un email la noche anterior a cada compromiso pendiente.'
-                : 'No recibirás emails de recordatorio aunque el administrador los tenga habilitados.'}
-            </p>
-          </div>
-        </label>
+                ? <><Bell size={14} className="shrink-0 text-primary-500" /> Recordatorios activados</>
+                : <><BellOff size={14} className="shrink-0 text-gray-400" /> Recordatorios desactivados</>
+              }
+            </span>
+          </label>
 
-        {/* Selector de hora */}
-        <div className={cn('transition-opacity', (!enabled || !globallyEnabled) && 'opacity-40 pointer-events-none')}>
-          <label className={labelCls}>Hora de envío</label>
-          <select
-            value={hour}
-            onChange={e => setHour(Number(e.target.value))}
-            disabled={!enabled || !globallyEnabled}
-            className={inputCls}
-          >
-            {HOURS.map(h => (
-              <option key={h} value={h}>{fmtHour(h)}</option>
-            ))}
-          </select>
-          <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
-            Zona horaria: <span className="font-medium text-gray-500 dark:text-slate-400">{tzLabel}</span>
-          </p>
+          {/* Selector de hora */}
+          <div className={cn(
+            'flex shrink-0 items-center gap-2 transition-opacity',
+            (!enabled || !globallyEnabled) && 'opacity-40 pointer-events-none',
+          )}>
+            <label htmlFor="reminder-hour" className="text-xs text-gray-500 dark:text-slate-400">Hora</label>
+            <select
+              id="reminder-hour"
+              value={hour}
+              onChange={e => setHour(Number(e.target.value))}
+              disabled={!enabled || !globallyEnabled}
+              className={cn(
+                'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 outline-none transition-colors',
+                'dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100',
+                'focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+            >
+              {HOURS.map(h => (
+                <option key={h} value={h}>{fmtHour(h)}</option>
+              ))}
+            </select>
+          </div>
         </div>
+        <p className="-mt-2 pl-1 text-[11px] text-gray-400 dark:text-slate-500">
+          Zona horaria: <span className="font-medium text-gray-500 dark:text-slate-400">{tzLabel}</span>
+        </p>
       </div>
 
       <div className="flex justify-end border-t border-gray-100 dark:border-slate-800 pt-4">
@@ -797,11 +796,16 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Dos columnas con flex-col para anclar botones al fondo */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Panel de configuración: secciones título/descripción + campos, en una sola card */}
+      <div className="divide-y divide-gray-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-soft">
 
-        <div className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-soft flex flex-col">
-          <h3 className="mb-5 text-sm font-semibold text-gray-800 dark:text-slate-200">Información personal</h3>
+        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Información personal</h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
+              Datos básicos y configuración regional, usados para formatear montos y fechas en toda la app.
+            </p>
+          </div>
           <ProfileInfoForm
             pendingAvatarFile={pendingAvatarFile}
             pendingDeleteAvatar={pendingDeleteAvatar}
@@ -809,18 +813,28 @@ export function ProfilePage() {
             onAvatarDeleted={handleAvatarDeleted}
             onClearPendingAvatar={handleCancelPending}
           />
-        </div>
+        </section>
 
-        <div className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-soft flex flex-col">
-          <h3 className="mb-5 text-sm font-semibold text-gray-800 dark:text-slate-200">Seguridad</h3>
+        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Seguridad</h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
+              Usa una contraseña segura para proteger el acceso a tu información financiera.
+            </p>
+          </div>
           <PasswordForm />
-        </div>
-      </div>
+        </section>
 
-      {/* Notificaciones */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-soft flex flex-col">
-        <h3 className="mb-5 text-sm font-semibold text-gray-800 dark:text-slate-200">Notificaciones</h3>
-        <NotificationsForm />
+        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Notificaciones</h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
+              Recibirás un email el día anterior a cada egreso o ingreso <strong>pendiente</strong>, con los compromisos del día siguiente agrupados.
+            </p>
+          </div>
+          <NotificationsForm />
+        </section>
+
       </div>
     </div>
   )
