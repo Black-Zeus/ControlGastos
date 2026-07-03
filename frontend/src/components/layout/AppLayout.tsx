@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sidebar } from './Sidebar'
 import { useSidebar } from '@/hooks/useSidebar'
+import { ScrollToTopButton } from '@/components/ScrollToTopButton'
 
 export function AppLayout() {
   const { collapsed, toggleCollapsed, mobileOpen, openMobile, closeMobile } = useSidebar()
@@ -41,6 +42,8 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      <ScrollToTopButton />
     </div>
   )
 }

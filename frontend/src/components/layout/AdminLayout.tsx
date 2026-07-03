@@ -7,6 +7,9 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { AboutModal } from '@/components/AboutModal'
+import { ScrollToTopButton } from '@/components/ScrollToTopButton'
+import logoUrl from '@/assets/logo.png'
 
 interface AdminNavItem {
   label: string
@@ -27,9 +30,10 @@ interface AdminSidebarContentProps {
   collapsed: boolean
   onToggleCollapsed: () => void
   onCloseMobile?: () => void
+  onOpenAbout: () => void
 }
 
-function AdminSidebarContent({ collapsed, onToggleCollapsed, onCloseMobile }: AdminSidebarContentProps) {
+function AdminSidebarContent({ collapsed, onToggleCollapsed, onCloseMobile, onOpenAbout }: AdminSidebarContentProps) {
   const { admin: user, logout } = useAdminAuth()
   const navigate = useNavigate()
 
@@ -42,18 +46,26 @@ function AdminSidebarContent({ collapsed, onToggleCollapsed, onCloseMobile }: Ad
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className={cn('flex items-center gap-3 px-5 py-5', collapsed && 'justify-center px-3')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-500">
-          <ShieldCheck size={16} className="text-white" />
-        </div>
-        <div
+        <button
+          type="button"
+          onClick={onOpenAbout}
+          title="Acerca de ControlGastos"
           className={cn(
-            'fade-text min-w-0 flex-1 overflow-hidden',
-            collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
+            '-m-1 flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left transition-colors hover:bg-slate-700',
+            collapsed && 'justify-center',
           )}
         >
-          <p className="text-sm font-semibold text-white">Administración</p>
-          <p className="truncate text-[11px] text-slate-400">ControlGastos</p>
-        </div>
+          <img src={logoUrl} alt="ControlGastos" className="h-8 w-8 shrink-0 rounded-xl object-cover" />
+          <div
+            className={cn(
+              'fade-text min-w-0 flex-1 overflow-hidden',
+              collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
+            )}
+          >
+            <p className="text-sm font-semibold text-white">Administración</p>
+            <p className="truncate text-[11px] text-slate-400">ControlGastos</p>
+          </div>
+        </button>
 
         {/* Cerrar mobile / Colapsar desktop */}
         {onCloseMobile ? (
@@ -159,6 +171,7 @@ function AdminSidebarContent({ collapsed, onToggleCollapsed, onCloseMobile }: Ad
 export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -173,6 +186,7 @@ export function AdminLayout() {
         <AdminSidebarContent
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed(c => !c)}
+          onOpenAbout={() => setAboutOpen(true)}
         />
       </aside>
 
@@ -196,6 +210,7 @@ export function AdminLayout() {
           collapsed={false}
           onToggleCollapsed={() => {}}
           onCloseMobile={() => setMobileOpen(false)}
+          onOpenAbout={() => setAboutOpen(true)}
         />
       </aside>
 
@@ -224,6 +239,9 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <ScrollToTopButton />
     </div>
   )
 }

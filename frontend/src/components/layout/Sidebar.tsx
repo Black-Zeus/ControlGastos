@@ -1,14 +1,17 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, TrendingDown, TrendingUp,
   Tags, CalendarRange, X, ChevronRight,
-  LogOut, CreditCard, UserCircle,
+  LogOut, UserCircle,
   ArrowLeftRight, Activity, PieChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { AboutModal } from '@/components/AboutModal'
 import { useAvatarUrl } from '@/hooks/useAvatarUrl'
+import logoUrl from '@/assets/logo.png'
 
 // ─── Definición de navegación ─────────────────────────────────────────────────
 
@@ -28,8 +31,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-      { label: 'Egresos',   icon: TrendingDown,    path: '/egresos' },
       { label: 'Ingresos',  icon: TrendingUp,      path: '/ingresos' },
+      { label: 'Egresos',   icon: TrendingDown,    path: '/egresos' },
     ],
   },
   {
@@ -115,6 +118,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const avatarUrl = useAvatarUrl()
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -126,17 +130,25 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
 
       {/* Logo / Nombre */}
       <div className={cn('flex items-center gap-3 px-4 py-5', collapsed && 'justify-center px-2')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-500">
-          <CreditCard size={16} className="text-white" />
-        </div>
-        <span
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          title="Acerca de ControlGastos"
           className={cn(
-            'fade-text overflow-hidden whitespace-nowrap font-semibold text-gray-900 dark:text-slate-100',
-            collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
+            '-m-1 flex min-w-0 items-center gap-3 rounded-xl p-1 transition-colors hover:bg-gray-100 dark:hover:bg-slate-800',
+            collapsed && 'justify-center',
           )}
         >
-          ControlGastos
-        </span>
+          <img src={logoUrl} alt="ControlGastos" className="h-8 w-8 shrink-0 rounded-xl object-cover" />
+          <span
+            className={cn(
+              'fade-text overflow-hidden whitespace-nowrap text-left font-semibold text-gray-900 dark:text-slate-100',
+              collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
+            )}
+          >
+            ControlGastos
+          </span>
+        </button>
 
         {/* Botón colapsar (desktop) / cerrar (mobile) */}
         <button
@@ -144,18 +156,6 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
           className="ml-auto rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
         >
           <X size={18} />
-        </button>
-        <button
-          onClick={onToggleCollapsed}
-          className={cn(
-            'ml-auto hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100',
-            'dark:text-slate-400 dark:hover:bg-slate-800',
-            'lg:block',
-            collapsed && 'mx-auto ml-auto',
-          )}
-          title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <X size={18} />}
         </button>
       </div>
 
@@ -265,6 +265,19 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
         )}
       >
         {sidebarContent}
+
+        {/* Botón colapsar/expandir — mitad dentro, mitad fuera del sidebar */}
+        <button
+          onClick={onToggleCollapsed}
+          title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+          className={cn(
+            'absolute -right-[18px] top-6 z-30 flex h-6 w-6 items-center justify-center rounded-full border shadow-sm transition-colors',
+            'border-gray-200 bg-white text-gray-500 hover:bg-gray-50',
+            'dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700',
+          )}
+        >
+          <ChevronRight size={14} className={cn('transition-transform', !collapsed && 'rotate-180')} />
+        </button>
       </aside>
 
       {/* ── Mobile: overlay ────────────────────────────────────────────────── */}
@@ -287,6 +300,8 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
       >
         {sidebarContent}
       </aside>
+
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </>
   )
 }
