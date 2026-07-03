@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, Loader2, ShieldAlert } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Loader2, ShieldAlert } from 'lucide-react'
 import logoUrl from '@/assets/logo.png'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
 import { cn } from '@/lib/utils'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -14,6 +15,8 @@ export function AdminForceChangePwdPage() {
   const [current,  setCurrent]  = useState('')
   const [next,     setNext]     = useState('')
   const [confirm,  setConfirm]  = useState('')
+  const [showCur,  setShowCur]  = useState(false)
+  const [showNew,  setShowNew]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
 
@@ -57,6 +60,19 @@ export function AdminForceChangePwdPage() {
     }
   }
 
+  function EyeToggle({ visible, onToggle }: { visible: boolean; onToggle: () => void }) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        tabIndex={-1}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+      >
+        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-sm">
@@ -79,57 +95,67 @@ export function AdminForceChangePwdPage() {
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
               Contraseña actual
             </label>
-            <input
-              type="password"
-              value={current}
-              onChange={e => setCurrent(e.target.value)}
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              className={cn(
-                'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100',
-                'placeholder:text-slate-500 outline-none',
-                'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
-              )}
-            />
+            <div className="relative">
+              <input
+                type={showCur ? 'text' : 'password'}
+                value={current}
+                onChange={e => setCurrent(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className={cn(
+                  'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 pr-10 text-sm text-slate-100',
+                  'placeholder:text-slate-500 outline-none',
+                  'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
+                )}
+              />
+              <EyeToggle visible={showCur} onToggle={() => setShowCur(v => !v)} />
+            </div>
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
               Nueva contraseña
             </label>
-            <input
-              type="password"
-              value={next}
-              onChange={e => setNext(e.target.value)}
-              required
-              autoComplete="new-password"
-              placeholder="Mínimo 8 caracteres"
-              className={cn(
-                'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100',
-                'placeholder:text-slate-500 outline-none',
-                'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
-              )}
-            />
+            <div className="relative">
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={next}
+                onChange={e => setNext(e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="Mínimo 8 caracteres"
+                className={cn(
+                  'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 pr-10 text-sm text-slate-100',
+                  'placeholder:text-slate-500 outline-none',
+                  'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
+                )}
+              />
+              <EyeToggle visible={showNew} onToggle={() => setShowNew(v => !v)} />
+            </div>
+            <PasswordStrengthBar password={next} />
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
               Confirmar nueva contraseña
             </label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              required
-              autoComplete="new-password"
-              placeholder="••••••••"
-              className={cn(
-                'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100',
-                'placeholder:text-slate-500 outline-none',
-                'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
-              )}
-            />
+            <div className="relative">
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className={cn(
+                  'w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 pr-10 text-sm text-slate-100',
+                  'placeholder:text-slate-500 outline-none',
+                  'focus:border-primary-500 focus:ring-2 focus:ring-primary-900/50 transition-colors',
+                )}
+              />
+              <EyeToggle visible={showNew} onToggle={() => setShowNew(v => !v)} />
+            </div>
           </div>
 
           {error && (

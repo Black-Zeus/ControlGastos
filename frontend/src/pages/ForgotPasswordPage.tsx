@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import logoUrl from '@/assets/logo.png'
+import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
 import { cn } from '@/lib/utils'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -15,6 +16,7 @@ export function ForgotPasswordPage() {
   const [resetToken, setResetToken] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPwd, setConfirmPwd]   = useState('')
+  const [showPwd, setShowPwd]       = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [loading, setLoading]       = useState(false)
 
@@ -165,15 +167,28 @@ export function ForgotPasswordPage() {
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Nueva contraseña
               </label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                required autoFocus minLength={8} placeholder="Mínimo 8 caracteres" className={inputCls} />
+              <div className="relative">
+                <input type={showPwd ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  required autoFocus minLength={8} placeholder="Mínimo 8 caracteres" className={cn(inputCls, 'pr-10')} />
+                <button type="button" onClick={() => setShowPwd(v => !v)} tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                  {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <PasswordStrengthBar password={newPassword} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Confirmar contraseña
               </label>
-              <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)}
-                required placeholder="Repite la contraseña" className={inputCls} />
+              <div className="relative">
+                <input type={showPwd ? 'text' : 'password'} value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)}
+                  required placeholder="Repite la contraseña" className={cn(inputCls, 'pr-10')} />
+                <button type="button" onClick={() => setShowPwd(v => !v)} tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                  {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
             {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
             <button type="submit" disabled={loading}

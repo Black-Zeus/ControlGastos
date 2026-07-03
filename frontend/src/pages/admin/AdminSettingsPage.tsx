@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Mail, Server, User, Lock, AtSign, ShieldCheck,
   Save, Send, CheckCircle, AlertCircle, Loader2, RefreshCw, Globe, Search, Bell,
+  Eye, EyeOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type SmtpSettings, type EmailLog, type GeneralSettings, type ReminderSettings } from '@/lib/adminApi'
@@ -66,6 +67,7 @@ export function AdminSettingsPage() {
   const [saving, setSaving]       = useState(false)
   const [testing, setTesting]     = useState(false)
   const [testEmail, setTestEmail] = useState('')
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false)
   const [toast, setToast]         = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
   // General
@@ -300,13 +302,23 @@ export function AdminSettingsPage() {
                 />
               </Field>
               <Field label="Contraseña" icon={Lock}>
-                <input
-                  type="password"
-                  value={form.smtp_password}
-                  onChange={e => set('smtp_password', e.target.value)}
-                  placeholder="••••••••"
-                  className={inputCls}
-                />
+                <div className="relative">
+                  <input
+                    type={showSmtpPassword ? 'text' : 'password'}
+                    value={form.smtp_password}
+                    onChange={e => set('smtp_password', e.target.value)}
+                    placeholder="••••••••"
+                    className={cn(inputCls, 'pr-9')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPassword(v => !v)}
+                    tabIndex={-1}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                  >
+                    {showSmtpPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </Field>
             </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import logoUrl from '@/assets/logo.png'
+import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
 import { cn } from '@/lib/utils'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -144,6 +145,7 @@ export function ResetPasswordPage() {
                   {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <PasswordStrengthBar password={password} />
             </div>
 
             <div>

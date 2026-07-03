@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, X, Trash2, AlertTriangle, FolderOpen, FolderCheck } from 'lucide-react'
+import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, X, Trash2, AlertTriangle, FolderOpen, FolderCheck, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type User, type UserCreatePayload, type UserUpdatePayload } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
 
 function fmtLastLogin(iso: string | null): string {
   if (!iso) return 'Nunca'
@@ -63,21 +64,38 @@ function Field({ label, id, type = 'text', placeholder, required, value, onChang
   label: string; id: string; type?: string; placeholder?: string
   required?: boolean; value: string; onChange: (v: string) => void
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const isPassword = type === 'password'
+
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
         {label}{required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
-      <input
-        id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} required={required}
-        className={cn(
-          'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900',
-          'dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500',
-          'placeholder:text-gray-400 outline-none transition-colors',
-          'focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30',
+      <div className="relative">
+        <input
+          id={id} type={isPassword ? (showPassword ? 'text' : 'password') : type}
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} required={required}
+          className={cn(
+            'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900',
+            'dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500',
+            'placeholder:text-gray-400 outline-none transition-colors',
+            'focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30',
+            isPassword && 'pr-10',
+          )}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            tabIndex={-1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+          >
+            {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
         )}
-      />
+      </div>
     </div>
   )
 }
@@ -347,7 +365,10 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Nombre" id="c-name" value={name} onChange={setName} placeholder="Juan Pérez" required />
         <Field label="Email" id="c-email" type="email" value={email} onChange={setEmail} placeholder="juan@correo.com" required />
-        <Field label="Contraseña" id="c-pass" type="password" value={password} onChange={setPassword} required />
+        <div>
+          <Field label="Contraseña" id="c-pass" type="password" value={password} onChange={setPassword} required />
+          <PasswordStrengthBar password={password} />
+        </div>
         <RoleToggle isAdmin={isAdmin} onChange={setIsAdmin} />
         {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex gap-3 pt-1">
@@ -474,7 +495,10 @@ function PasswordModal({ user, onClose }: { user: User; onClose: () => void }) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Nueva contraseña" id="p-new" type="password" value={password} onChange={setPassword} required />
+          <div>
+            <Field label="Nueva contraseña" id="p-new" type="password" value={password} onChange={setPassword} required />
+            <PasswordStrengthBar password={password} />
+          </div>
           <Field label="Confirmar contraseña" id="p-conf" type="password" value={confirm} onChange={setConfirm} required />
           {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="flex gap-3 pt-1">
