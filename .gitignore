@@ -11,14 +11,10 @@
 !.env.prd.example
 
 # ── Persistencia (datos de runtime) ─────────────────────────
-APP/data/
 APP/logs/
 APP/volumes/
 
 # Mantener la estructura de carpetas
-!APP/data/dev/.gitkeep
-!APP/data/qa/.gitkeep
-!APP/data/prd/.gitkeep
 !APP/logs/dev/.gitkeep
 !APP/logs/qa/.gitkeep
 !APP/logs/prd/.gitkeep

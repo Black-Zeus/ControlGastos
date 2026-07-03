@@ -95,8 +95,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - ${DATA_ROOT}/postgres:/var/lib/postgresql/data
-      - ${LOGS_ROOT}/postgres:/var/log/postgresql
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
@@ -120,7 +119,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
-      - ${DATA_ROOT}/minio:/data
+      - minio_data:/data
     networks:
       - internal
     ports:
@@ -231,6 +230,10 @@ services:
 
 # ── Volúmenes nombrados ────────────────────────────────────────
 volumes:
+  postgres_data:
+    name: ${PROJECT_NAME}-${ENV}-postgres
+  minio_data:
+    name: ${PROJECT_NAME}-${ENV}-minio
   frontend_node_modules:
     name: ${PROJECT_NAME}_frontend_node_modules
 
