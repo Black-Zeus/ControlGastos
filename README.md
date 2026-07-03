@@ -97,10 +97,12 @@ Cada entorno usa su propio archivo de variables: `.env` (base compartida) + `.en
 git clone <repo> controlgastos && cd controlgastos
 
 # 2. Crear variables de entorno
+# .env.example trae todas las secciones (común/dev/qa/prd) comentadas.
+# Copiar la sección "COMÚN" a .env y la sección "PRD" a .env.prd.
 cp .env.example .env
-cp .env.prd.example .env.prd
-# Editar .env con credenciales seguras
-# Editar .env.prd con la IP/dominio del servidor y configuración SMTP
+cp .env.example .env.prd
+# Editar .env dejando solo las variables de la sección COMÚN, con credenciales seguras
+# Editar .env.prd dejando solo las variables de la sección PRD, con la IP/dominio del servidor
 
 # 3. Levantar el stack (las migraciones corren automáticamente al iniciar el backend)
 docker compose --env-file .env --env-file .env.prd up -d --build

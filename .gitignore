@@ -4,11 +4,8 @@
 .env.qa
 .env.prd
 
-# Mantener los ejemplos
+# Mantener el ejemplo
 !.env.example
-!.env.dev.example
-!.env.qa.example
-!.env.prd.example
 
 # ── Persistencia (datos de runtime) ─────────────────────────
 APP/logs/
