@@ -186,6 +186,7 @@ async def open_period(
         select(Period)
         .where(Period.user_id == current_user.id)
         .order_by(Period.year.desc(), Period.month.desc())
+        .limit(1)
     )).scalar_one_or_none()
 
     if latest_any:
@@ -215,6 +216,7 @@ async def open_period(
             Period.user_id == current_user.id,
             Period.status == PeriodStatus.cerrado,
         ).order_by(Period.year.desc(), Period.month.desc())
+        .limit(1)
     )).scalar_one_or_none()
 
     if last_closed:
@@ -466,6 +468,7 @@ async def reopen_period(
             Period.user_id == current_user.id,
             Period.status == PeriodStatus.cerrado,
         ).order_by(Period.year.desc(), Period.month.desc())
+        .limit(1)
     )).scalar_one_or_none()
 
     if not last_closed or last_closed.id != period_id:
