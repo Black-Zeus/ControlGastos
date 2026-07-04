@@ -7,6 +7,30 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ## 0.2.1 — En curso
 
+### Mejoras sobre Listas de Compra
+
+- El campo Cantidad se normaliza como unidades enteras positivas (paquetes/unidades), manteniendo
+  controles nativos de `input type="number"` con `step=1`; Valor unitario mantiene formato de
+  moneda según configuración del usuario.
+- El formulario de producto agrega `Observación` por línea (por ejemplo marca o tamaño distinto);
+  se persiste en `shopping_list_items.observation`, pero no se muestra como columna en la tabla.
+- El detalle de lista incorpora el botón "Enviar a egreso" junto a Volver/Reiniciar lista,
+  reutilizando el mismo modal del listado.
+- El modal "Enviar a egreso" queda alineado con Egresos: campo visible `Descripción`,
+  responsable por defecto = usuario conectado, y selector de Responsable con autocomplete/DDL
+  compartido con el modal de egresos.
+- El envío a egreso deja el pago como `saldado` y, si la lista ya generó un egreso en el período
+  abierto, actualiza ese egreso agregando solo productos nuevos en vez de crear uno duplicado.
+- La detección de pendientes de envío es por período abierto: una lista enviada en un período
+  cerrado puede volver a enviarse en el nuevo período, mientras que dentro del mismo período no
+  recobra productos ya incluidos.
+- La tabla de Listas de Compra reemplaza "Última actualización" por "Último envío" y agrega un
+  estado operativo (`Sin compras`, `En proceso`, `Procesada`) separado del estado de archivo.
+
+---
+
+## 0.2.0
+
 ### Nueva funcionalidad
 
 - **Listas de Compra**: nueva sección para armar listas reutilizables (supermercado, feria,
@@ -43,23 +67,6 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
     (calculado), ambas editables directamente en la tabla; el botón "Editar" en Acciones abre un
     modal que recupera todos los valores actuales del producto (mismo formulario que "Agregar
     producto"). El monto del egreso generado por `send-to-expense` ahora es `cantidad × precio`.
-  - El campo Cantidad se normaliza como unidades enteras positivas (paquetes/unidades), manteniendo
-    controles nativos de `input type="number"` con `step=1`; Valor unitario mantiene formato de
-    moneda según configuración del usuario.
-  - El formulario de producto agrega `Observación` por línea (por ejemplo marca o tamaño distinto);
-    se persiste en `shopping_list_items.observation`, pero no se muestra como columna en la tabla.
-  - El detalle de lista incorpora el botón "Enviar a egreso" junto a Volver/Reiniciar lista,
-    reutilizando el mismo modal del listado.
-  - El modal "Enviar a egreso" queda alineado con Egresos: campo visible `Descripción`,
-    responsable por defecto = usuario conectado, y selector de Responsable con autocomplete/DDL
-    compartido con el modal de egresos.
-  - El envío a egreso deja el pago como `saldado` y, si la lista ya generó un egreso en el período
-    abierto, actualiza ese egreso agregando solo productos nuevos en vez de crear uno duplicado.
-  - La detección de pendientes de envío es por período abierto: una lista enviada en un período
-    cerrado puede volver a enviarse en el nuevo período, mientras que dentro del mismo período no
-    recobra productos ya incluidos.
-  - La tabla de Listas de Compra reemplaza "Última actualización" por "Último envío" y agrega un
-    estado operativo (`Sin compras`, `En proceso`, `Procesada`) separado del estado de archivo.
 
 ### Otros cambios
 
