@@ -46,6 +46,8 @@ class ExpenseOut(BaseModel):
     responsible_tag: Optional[str]
     created_at: datetime
     attachment_count: int = 0
+    shopping_list_id: Optional[uuid.UUID] = None
+    items: Optional[list[dict]] = None
 
     model_config = {"from_attributes": True}
 
@@ -123,6 +125,8 @@ def _build_out(expense: Expense, cat: Optional[Category], attachment_count: int 
         "responsible_tag":  expense.responsible_tag,
         "created_at":       expense.created_at,
         "attachment_count": attachment_count,
+        "shopping_list_id": expense.shopping_list_id,
+        "items":            expense.items,
     }
 
 
