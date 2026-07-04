@@ -5,7 +5,7 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
-## 0.2.0 — En curso
+## 0.2.1 — En curso
 
 ### Nueva funcionalidad
 
