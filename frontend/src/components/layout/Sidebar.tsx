@@ -4,7 +4,7 @@ import {
   LayoutDashboard, TrendingDown, TrendingUp,
   Tags, CalendarRange, X, ChevronRight,
   LogOut, UserCircle,
-  ArrowLeftRight, Activity, PieChart, HelpCircle,
+  ArrowLeftRight, Activity, PieChart, HelpCircle, ShoppingCart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -33,6 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { label: 'Ingresos',  icon: TrendingUp,      path: '/ingresos' },
       { label: 'Egresos',   icon: TrendingDown,    path: '/egresos' },
+      { label: 'Listas de compra', icon: ShoppingCart, path: '/listas-compra' },
     ],
   },
   {

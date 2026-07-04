@@ -119,6 +119,8 @@ export interface Expense {
   responsible_tag: string | null
   created_at: string
   attachment_count: number
+  shopping_list_id: string | null
+  items: { label: string; amount: string }[] | null
 }
 
 export interface AttachmentOut {
@@ -211,6 +213,71 @@ export interface PeriodClosePayload {
 
 export interface PeriodOpenOut extends Period {
   carry_forward_count: number
+}
+
+// ─── Listas de compra ─────────────────────────────────────────────────────────
+
+export interface ShoppingListItem {
+  id: string
+  label: string
+  quantity: string
+  purchased: boolean
+  unit_price: string | null
+  observation: string | null
+  obviable: boolean
+  sent_at: string | null
+  position: number
+}
+
+export interface ShoppingList {
+  id: string
+  name: string
+  default_category_id: string | null
+  archived: boolean
+  created_at: string
+  updated_at: string
+  last_sent_at: string | null
+  items: ShoppingListItem[]
+  item_count: number
+  purchased_count: number
+  pending_send_count: number
+}
+
+export interface ShoppingListCreatePayload {
+  name: string
+  default_category_id?: string | null
+}
+
+export interface ShoppingListUpdatePayload {
+  name?: string
+  default_category_id?: string | null
+  archived?: boolean
+}
+
+export interface ShoppingListItemCreatePayload {
+  label: string
+  quantity?: string
+  unit_price?: string | null
+  observation?: string | null
+  obviable?: boolean
+}
+
+export interface ShoppingListItemUpdatePayload {
+  label?: string
+  quantity?: string
+  purchased?: boolean
+  unit_price?: string | null
+  observation?: string | null
+  obviable?: boolean
+  position?: number
+}
+
+export interface SendToExpensePayload {
+  date: string
+  label?: string
+  category_id?: string
+  observation?: string | null
+  responsible_tag?: string | null
 }
 
 export const userApi = {
@@ -327,5 +394,20 @@ export const userApi = {
     },
     delete:  (expenseId: string, attId: string)          => request<void>(`/v1/expenses/${expenseId}/attachments/${attId}`, { method: 'DELETE' }),
     contentUrl: (expenseId: string, attId: string)       => `${BASE}/v1/expenses/${expenseId}/attachments/${attId}/content`,
+  },
+  shoppingLists: {
+    list:   (archived?: boolean)                         => request<ShoppingList[]>(`/v1/shopping-lists${archived !== undefined ? `?archived=${archived}` : ''}`),
+    get:    (id: string)                                 => request<ShoppingList>(`/v1/shopping-lists/${id}`),
+    create: (body: ShoppingListCreatePayload)            => request<ShoppingList>('/v1/shopping-lists', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: ShoppingListUpdatePayload) => request<ShoppingList>(`/v1/shopping-lists/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: (id: string)                                 => request<void>(`/v1/shopping-lists/${id}`, { method: 'DELETE' }),
+    clone:  (id: string, name?: string)                  => request<ShoppingList>(`/v1/shopping-lists/${id}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
+    reset:  (id: string)                                 => request<ShoppingList>(`/v1/shopping-lists/${id}/reset`, { method: 'POST' }),
+    sendToExpense: (id: string, body: SendToExpensePayload) => request<Expense>(`/v1/shopping-lists/${id}/send-to-expense`, { method: 'POST', body: JSON.stringify(body) }),
+    items: {
+      create: (listId: string, body: ShoppingListItemCreatePayload)                => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items`, { method: 'POST', body: JSON.stringify(body) }),
+      update: (listId: string, itemId: string, body: ShoppingListItemUpdatePayload) => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+      delete: (listId: string, itemId: string)                                     => request<void>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE' }),
+    },
   },
 }

@@ -13,6 +13,7 @@ import { DataTable, type Column, type RowAction } from '@/components/ui/DataTabl
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
+import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -84,34 +85,6 @@ function PeriodIndicator({ openPeriod }: { openPeriod: Period | null }) {
   )
 }
 
-// ─── Helpers de monto ────────────────────────────────────────────────────────
-
-function parseAmountInput(value: string, step: string): string {
-  const v = value.trim().replace(/[^\d.,]/g, '')
-  if (!v) return ''
-  const hasDot = v.includes('.')
-  const hasComma = v.includes(',')
-  let n = v
-  if (hasDot && hasComma) {
-    const li = v.lastIndexOf('.'), lc = v.lastIndexOf(',')
-    n = lc > li ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '')
-  } else if (hasComma) {
-    n = /^(\d{1,3})(,\d{3})*$/.test(v) ? v.replace(/,/g, '') : v.replace(',', '.')
-  } else if (hasDot) {
-    if (step === '1' || /^(\d{1,3})(\.\d{3})+$/.test(v)) n = v.replace(/\./g, '')
-  }
-  const num = parseFloat(n)
-  if (!Number.isFinite(num)) return ''
-  return step === '1' ? String(Math.round(num)) : String(num)
-}
-
-function fmtAmountInput(value: string, step: string): string {
-  if (!value) return ''
-  const num = parseFloat(value)
-  if (!Number.isFinite(num)) return value
-  const dec = step === '1' ? 0 : 2
-  return num.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
-}
 
 interface IncomeFormProps {
   initial?: Partial<IncomeCreatePayload> & { payment_status?: 'recibido' | 'pendiente' }
@@ -369,12 +342,10 @@ type ModalState =
 
 type Filters = Record<string, string | string[]>
 
-const ZERO_DECIMAL_CURRENCIES = new Set(['CLP', 'CRC', 'COP', 'PYG', 'JPY', 'KRW', 'IDR', 'VND'])
-
 export function IncomesPage() {
   const { user } = useAuth()
   const currency = user?.currency ?? 'CRC'
-  const amountStep = ZERO_DECIMAL_CURRENCIES.has(currency) ? '1' : '0.01'
+  const amountStep = amountStepFor(currency)
   const [year, setYear] = useState<number | null>(null)
   const [month, setMonth] = useState<number | null>(null)
   const [ready, setReady] = useState(false)

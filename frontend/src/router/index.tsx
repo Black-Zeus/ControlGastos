@@ -11,6 +11,8 @@ import { ExpensesPage } from '@/pages/ExpensesPage'
 import { IncomesPage } from '@/pages/IncomesPage'
 import { PeriodsPage } from '@/pages/PeriodsPage'
 import { HelpPage } from '@/pages/HelpPage'
+import { ShoppingListsPage } from '@/pages/ShoppingListsPage'
+import { ShoppingListDetailPage } from '@/pages/ShoppingListDetailPage'
 import { AdminLoginPage } from '@/pages/admin/AdminLoginPage'
 import { AdminForceChangePwdPage } from '@/pages/admin/AdminForceChangePwdPage'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
@@ -98,6 +100,8 @@ export function AppRouter() {
         <Route index element={<DashboardPage />} />
         <Route path="egresos"    element={<ExpensesPage />} />
         <Route path="ingresos"   element={<IncomesPage />} />
+        <Route path="listas-compra"     element={<ShoppingListsPage />} />
+        <Route path="listas-compra/:id" element={<ShoppingListDetailPage />} />
         <Route path="reportes">
           <Route index element={<Navigate to="comparacion" replace />} />
           <Route path="comparacion" element={<ReporteComparacionPage />} />

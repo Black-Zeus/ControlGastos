@@ -1,20 +1,21 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   userApi, authToken,
-  type Expense, type AttachmentOut,
+  type Expense, type AttachmentOut, type ShoppingList,
   type ExpenseCreatePayload, type ExpenseUpdatePayload,
   type UserCategory, type Period,
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
+import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,78 @@ function fmtBytes(n: number) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function ResponsibleCombobox({
+  value,
+  options,
+  onChange,
+  inputClassName,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  inputClassName: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const filtered = options.filter(option => option.toLowerCase().includes(value.toLowerCase()))
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={e => { onChange(e.target.value); setOpen(true) }}
+          placeholder="Ej: familia"
+          className={cn(inputClassName, 'pr-9')}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+        >
+          <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
+          <ul className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-gray-400 dark:text-slate-500">Sin resultados</li>
+            ) : filtered.map(option => (
+              <li key={option}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(option); setOpen(false) }}
+                  className={cn(
+                    'flex w-full items-center justify-between px-3 py-2 text-sm transition-colors',
+                    option === value
+                      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  {option}
+                  {option === value && <Check size={13} className="text-primary-500" />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -421,34 +494,76 @@ function AttachmentViewerModal({
   )
 }
 
-// ─── Helpers de monto ────────────────────────────────────────────────────────
+// ─── Vista de solo lectura de la lista de compra de origen ────────────────────
 
-function parseAmountInput(value: string, step: string): string {
-  const v = value.trim().replace(/[^\d.,]/g, '')
-  if (!v) return ''
-  const hasDot = v.includes('.')
-  const hasComma = v.includes(',')
-  let n = v
-  if (hasDot && hasComma) {
-    const li = v.lastIndexOf('.'), lc = v.lastIndexOf(',')
-    n = lc > li ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '')
-  } else if (hasComma) {
-    n = /^(\d{1,3})(,\d{3})*$/.test(v) ? v.replace(/,/g, '') : v.replace(',', '.')
-  } else if (hasDot) {
-    if (step === '1' || /^(\d{1,3})(\.\d{3})+$/.test(v)) n = v.replace(/\./g, '')
-  }
-  const num = parseFloat(n)
-  if (!Number.isFinite(num)) return ''
-  return step === '1' ? String(Math.round(num)) : String(num)
+function ShoppingListPreviewModal({ listId, currency, onClose }: {
+  listId: string
+  currency: string
+  onClose: () => void
+}) {
+  const [list, setList] = useState<ShoppingList | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    userApi.shoppingLists.get(listId)
+      .then(setList)
+      .catch(e => setError(e instanceof Error ? e.message : 'Error'))
+      .finally(() => setLoading(false))
+  }, [listId])
+
+  const purchasedItems = list?.items.filter(item => item.purchased) ?? []
+  const total = purchasedItems.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price ?? 0), 0)
+
+  return (
+    <Modal title="Lista de compra de origen" onClose={onClose}>
+      {loading && <p className="text-sm text-gray-400 dark:text-slate-500">Cargando…</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {list && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-gray-900 dark:text-slate-100">{list.name}</p>
+            {list.archived && (
+              <span className="inline-flex rounded-full bg-gray-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-400">Archivada</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 dark:text-slate-500">
+            Productos comprados de esta lista — vista de solo lectura, puede haber cambiado desde
+            que se generó este egreso.
+          </p>
+          <div className="rounded-xl border border-gray-100 dark:border-slate-800">
+            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+              {purchasedItems.map(item => (
+                <div key={item.id} className="flex items-center gap-3 px-3 py-2">
+                  <span className="flex-1 text-sm text-gray-700 dark:text-slate-300">
+                    {item.label} <span className="text-gray-400 dark:text-slate-500">× {item.quantity}</span>
+                  </span>
+                  <span className="text-sm tabular-nums text-gray-500 dark:text-slate-400">
+                    {item.unit_price ? fmtMoney(Number(item.quantity) * Number(item.unit_price), currency) : '—'}
+                  </span>
+                </div>
+              ))}
+              {purchasedItems.length === 0 && (
+                <p className="px-3 py-4 text-center text-sm text-gray-400 dark:text-slate-500">
+                  Ningún producto de esta lista está marcado como comprado.
+                </p>
+              )}
+            </div>
+            {purchasedItems.length > 0 && (
+              <div className="flex items-center justify-between rounded-b-xl bg-gray-50 px-3 py-2.5 dark:bg-slate-800/60">
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Total</span>
+                <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+                  {fmtMoney(total, currency)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
 }
 
-function fmtAmountInput(value: string, step: string): string {
-  if (!value) return ''
-  const num = parseFloat(value)
-  if (!Number.isFinite(num)) return value
-  const dec = step === '1' ? 0 : 2
-  return num.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
-}
 
 // ─── Formulario de egreso ─────────────────────────────────────────────────────
 
@@ -464,6 +579,8 @@ interface ExpenseFormProps {
   onCancel: () => void
   submitLabel: string
   onPreviewAttachment?: (att: AttachmentOut) => void
+  shoppingListId?: string | null
+  onViewShoppingList?: () => void
 }
 
 function periodDateRange(p: Period | null) {
@@ -480,6 +597,7 @@ function ExpenseForm({
   initial, expenseId, categories, openPeriod, amountStep = '0.01', currency: _currency,
   defaultResponsible = '',
   onSubmit, onCancel, submitLabel, onPreviewAttachment,
+  shoppingListId, onViewShoppingList,
 }: ExpenseFormProps) {
   const today = new Date().toISOString().slice(0, 10)
   const { min: dateMin, max: dateMax } = periodDateRange(openPeriod)
@@ -583,6 +701,17 @@ function ExpenseForm({
         {/* Columna izquierda: Fecha → Monto → Categoría → Descripción → Responsable|Obviable → Estado pago */}
         <div className="space-y-4">
           <PeriodIndicator openPeriod={openPeriod} />
+
+          {shoppingListId && (
+            <button
+              type="button"
+              onClick={onViewShoppingList}
+              className="flex w-full items-center gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-left text-sm text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+            >
+              <ShoppingCart size={14} className="shrink-0" />
+              Este egreso viene de una lista de compra — ver detalle
+            </button>
+          )}
 
           {/* Fecha | Monto */}
           <div className="grid grid-cols-2 gap-4">
@@ -705,19 +834,12 @@ function ExpenseForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Responsable</label>
-              <input
-                list="responsible-datalist"
+              <ResponsibleCombobox
                 value={responsible}
-                onChange={e => setResponsible(e.target.value)}
-                placeholder="Ej: familia"
-                className={inputCls}
-                autoComplete="off"
+                options={responsibleTags}
+                onChange={setResponsible}
+                inputClassName={inputCls}
               />
-              <datalist id="responsible-datalist">
-                {responsibleTags.map(tag => (
-                  <option key={tag} value={tag} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className={labelCls}>Obviable</label>
@@ -795,17 +917,16 @@ type ModalState =
   | { type: 'edit'; expense: Expense }
   | { type: 'delete'; expense: Expense }
   | { type: 'attachments'; expense: Expense; att?: AttachmentOut }
+  | { type: 'shopping-list-preview'; listId: string }
   | null
 
 type Filters = Record<string, string | string[]>
-
-const ZERO_DECIMAL_CURRENCIES = new Set(['CLP', 'CRC', 'COP', 'PYG', 'JPY', 'KRW', 'IDR', 'VND'])
 
 export function ExpensesPage() {
   const { user } = useAuth()
   const currency  = user?.currency ?? 'CRC'
   const userName  = user?.name ?? ''
-  const amountStep = ZERO_DECIMAL_CURRENCIES.has(currency) ? '1' : '0.01'
+  const amountStep = amountStepFor(currency)
   const [year, setYear]   = useState<number | null>(null)
   const [month, setMonth] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
@@ -1010,6 +1131,12 @@ export function ExpensesPage() {
       onClick:  e => setModal({ type: 'attachments', expense: e }),
     },
     {
+      icon:     ShoppingCart,
+      label:    'Ver lista de compra',
+      disabled: e => !e.shopping_list_id,
+      onClick:  e => setModal({ type: 'shopping-list-preview', listId: e.shopping_list_id! }),
+    },
+    {
       icon: Trash2, label: 'Eliminar', variant: 'danger',
       disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'delete', expense }),
@@ -1096,6 +1223,17 @@ export function ExpensesPage() {
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}
+        isExpandable={e => !!e.items && e.items.length > 0}
+        renderExpanded={e => (
+          <div className="max-w-xs space-y-1 pl-8">
+            {e.items!.map((item, i) => (
+              <div key={i} className="flex items-center gap-4 text-sm">
+                <span className="flex-1 text-gray-600 dark:text-slate-400">{item.label}</span>
+                <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-slate-300">{fmtMoney(Number(item.amount), currency)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       />
 
       {/* Modal: crear egreso */}
@@ -1135,6 +1273,8 @@ export function ExpensesPage() {
             submitLabel="Guardar"
             onCancel={() => setModal(null)}
             onPreviewAttachment={att => setModal({ type: 'attachments', expense: modal.expense, att })}
+            shoppingListId={modal.expense.shopping_list_id}
+            onViewShoppingList={() => setModal({ type: 'shopping-list-preview', listId: modal.expense.shopping_list_id! })}
             onSubmit={async (data) => {
               const updated = await userApi.expenses.update(modal.expense.id, data as ExpenseUpdatePayload)
               setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e))
@@ -1142,6 +1282,10 @@ export function ExpensesPage() {
             }}
           />
         </Modal>
+      )}
+
+      {modal?.type === 'shopping-list-preview' && (
+        <ShoppingListPreviewModal listId={modal.listId} currency={currency} onClose={() => setModal(null)} />
       )}
 
       {/* Modal: eliminar egreso */}
