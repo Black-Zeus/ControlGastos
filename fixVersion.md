@@ -5,7 +5,50 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
-## 0.2.1 — En curso
+## 0.3.0 — En curso
+
+### Nueva funcionalidad: ingesta de recibos por bot (OCR)
+
+- Flujo completo para integraciones externas (n8n, bots de WhatsApp/Telegram): se envía una foto
+  del recibo vía `POST /ingestion/receipts` (autenticado con token de ingesta, gestionable por el
+  propio usuario), el worker la procesa con Tesseract (`--psm 6` — validado contra boletas físicas
+  reales; el modo automático de Tesseract pierde las líneas de montos en fotos arrugadas o en
+  ángulo) y propone monto y categoría. El bot consulta `GET .../status` (polling) y confirma con
+  `POST .../confirm` (`/aceptar` con body vacío, `/modificar` con overrides parciales de los
+  campos a corregir) o descarta con `DELETE .../{id}` (`/cancelar`).
+- La categoría propuesta **aprende por usuario**: al confirmar un recibo se guarda qué categoría
+  se eligió para ese comercio (según la primera línea con contenido del texto OCR), y la próxima
+  boleta del mismo comercio ya la sugiere sola (`merchant_category_memory`). Aplica tanto al flujo
+  de bot como al formulario manual.
+- El token de ingesta queda acotado estrictamente a borradores propios sin confirmar — una vez
+  confirmado, ni `/status`, `/modificar` ni `/cancelar` pueden volver a tocarlo (404, no 409, para
+  no filtrar siquiera que el registro existe). No puede leer ni modificar nada creado por otra vía.
+- Nuevo `POST /expenses/ocr-preview`: el formulario "Nuevo egreso" ahora puede leer una foto
+  adjunta on-demand (OCR sincrónico, no persiste nada). Si el formulario está vacío autocompleta
+  monto/categoría directo; si ya hay datos cargados, pide confirmación antes de reemplazarlos
+  (modal "Analizando…" + modal de reemplazo).
+- Un borrador de ingesta sin confirmar deja de contar en los totales del período — Dashboard,
+  resumen de Períodos, reporte Por categoría y cierre de período lo excluyen. En Egresos se
+  muestra con badge "Borrador" y banner explicativo, con una acción de confirmación rápida (con
+  modal de confirmación, no de un solo clic).
+
+### Correcciones
+
+- `app/models/__init__.py` no importaba `ShoppingList` / `ShoppingListItem` — cualquier proceso
+  fuera del backend principal (como el worker de OCR) rompía al tocar `Category` por una foreign
+  key sin resolver hacia `shopping_lists`.
+- Un borrador de ingesta con monto ya propuesto por OCR se sumaba en los totales del período antes
+  de que el usuario lo confirmara.
+
+### Infraestructura
+
+- `tesseract-ocr` instalado también en la imagen del backend principal (antes solo la tenía el
+  worker de OCR separado) — necesario para el OCR sincrónico bajo demanda.
+- `.gitignore`: se excluyen las carpetas `evidencias-*/` (capturas de QA) y los `*.tsbuildinfo`.
+
+---
+
+## 0.2.1
 
 ### Mejoras sobre Listas de Compra
 
