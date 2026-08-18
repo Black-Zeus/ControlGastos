@@ -1,20 +1,21 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   userApi, authToken,
-  type Expense, type AttachmentOut,
+  type Expense, type AttachmentOut, type ShoppingList,
   type ExpenseCreatePayload, type ExpenseUpdatePayload,
-  type UserCategory, type Period,
+  type UserCategory, type Period, type OcrPreview,
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
+import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,78 @@ function fmtBytes(n: number) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function ResponsibleCombobox({
+  value,
+  options,
+  onChange,
+  inputClassName,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  inputClassName: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const filtered = options.filter(option => option.toLowerCase().includes(value.toLowerCase()))
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={e => { onChange(e.target.value); setOpen(true) }}
+          placeholder="Ej: familia"
+          className={cn(inputClassName, 'pr-9')}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+        >
+          <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
+          <ul className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-gray-400 dark:text-slate-500">Sin resultados</li>
+            ) : filtered.map(option => (
+              <li key={option}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(option); setOpen(false) }}
+                  className={cn(
+                    'flex w-full items-center justify-between px-3 py-2 text-sm transition-colors',
+                    option === value
+                      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  {option}
+                  {option === value && <Check size={13} className="text-primary-500" />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -52,6 +125,17 @@ function TypeBadge({ type }: { type: string }) {
     <span className="inline-flex rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">Recurrente</span>
   ) : (
     <span className="inline-flex rounded-full bg-amber-50 dark:bg-amber-900/20 px-2.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">Puntual</span>
+  )
+}
+
+// Egreso creado por ingesta (bot/OCR) aún sin confirmar por el usuario —
+// no cuenta en los totales de esta página ni en dashboard/reportes/cierre
+// de período hasta que se confirme.
+function DraftBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 px-2.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-400">
+      Borrador
+    </span>
   )
 }
 
@@ -119,9 +203,12 @@ interface AttachmentPanelProps {
   pendingFile: PendingFile | null
   onPendingChange: (f: PendingFile | null) => void
   onPreviewUploaded: (att: AttachmentOut) => void
+  // Solo dispara en el flujo de creación (sin expenseId todavía) — intenta
+  // leer monto/categoría de la imagen para proponerlos en el formulario.
+  onNewPendingFile?: (file: File) => void
 }
 
-function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded }: AttachmentPanelProps) {
+function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded, onNewPendingFile }: AttachmentPanelProps) {
   const [uploaded, setUploaded] = useState<AttachmentOut | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -164,6 +251,7 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
         file: rawFile,
         previewUrl: rawFile.type.startsWith('image/') ? URL.createObjectURL(rawFile) : null,
       })
+      if (rawFile.type.startsWith('image/')) onNewPendingFile?.(rawFile)
     }
   }
 
@@ -421,34 +509,76 @@ function AttachmentViewerModal({
   )
 }
 
-// ─── Helpers de monto ────────────────────────────────────────────────────────
+// ─── Vista de solo lectura de la lista de compra de origen ────────────────────
 
-function parseAmountInput(value: string, step: string): string {
-  const v = value.trim().replace(/[^\d.,]/g, '')
-  if (!v) return ''
-  const hasDot = v.includes('.')
-  const hasComma = v.includes(',')
-  let n = v
-  if (hasDot && hasComma) {
-    const li = v.lastIndexOf('.'), lc = v.lastIndexOf(',')
-    n = lc > li ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '')
-  } else if (hasComma) {
-    n = /^(\d{1,3})(,\d{3})*$/.test(v) ? v.replace(/,/g, '') : v.replace(',', '.')
-  } else if (hasDot) {
-    if (step === '1' || /^(\d{1,3})(\.\d{3})+$/.test(v)) n = v.replace(/\./g, '')
-  }
-  const num = parseFloat(n)
-  if (!Number.isFinite(num)) return ''
-  return step === '1' ? String(Math.round(num)) : String(num)
+function ShoppingListPreviewModal({ listId, currency, onClose }: {
+  listId: string
+  currency: string
+  onClose: () => void
+}) {
+  const [list, setList] = useState<ShoppingList | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    userApi.shoppingLists.get(listId)
+      .then(setList)
+      .catch(e => setError(e instanceof Error ? e.message : 'Error'))
+      .finally(() => setLoading(false))
+  }, [listId])
+
+  const purchasedItems = list?.items.filter(item => item.purchased) ?? []
+  const total = purchasedItems.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price ?? 0), 0)
+
+  return (
+    <Modal title="Lista de compra de origen" onClose={onClose}>
+      {loading && <p className="text-sm text-gray-400 dark:text-slate-500">Cargando…</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {list && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-gray-900 dark:text-slate-100">{list.name}</p>
+            {list.archived && (
+              <span className="inline-flex rounded-full bg-gray-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-400">Archivada</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 dark:text-slate-500">
+            Productos comprados de esta lista — vista de solo lectura, puede haber cambiado desde
+            que se generó este egreso.
+          </p>
+          <div className="rounded-xl border border-gray-100 dark:border-slate-800">
+            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+              {purchasedItems.map(item => (
+                <div key={item.id} className="flex items-center gap-3 px-3 py-2">
+                  <span className="flex-1 text-sm text-gray-700 dark:text-slate-300">
+                    {item.label} <span className="text-gray-400 dark:text-slate-500">× {item.quantity}</span>
+                  </span>
+                  <span className="text-sm tabular-nums text-gray-500 dark:text-slate-400">
+                    {item.unit_price ? fmtMoney(Number(item.quantity) * Number(item.unit_price), currency) : '—'}
+                  </span>
+                </div>
+              ))}
+              {purchasedItems.length === 0 && (
+                <p className="px-3 py-4 text-center text-sm text-gray-400 dark:text-slate-500">
+                  Ningún producto de esta lista está marcado como comprado.
+                </p>
+              )}
+            </div>
+            {purchasedItems.length > 0 && (
+              <div className="flex items-center justify-between rounded-b-xl bg-gray-50 px-3 py-2.5 dark:bg-slate-800/60">
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Total</span>
+                <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+                  {fmtMoney(total, currency)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
 }
 
-function fmtAmountInput(value: string, step: string): string {
-  if (!value) return ''
-  const num = parseFloat(value)
-  if (!Number.isFinite(num)) return value
-  const dec = step === '1' ? 0 : 2
-  return num.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
-}
 
 // ─── Formulario de egreso ─────────────────────────────────────────────────────
 
@@ -464,6 +594,8 @@ interface ExpenseFormProps {
   onCancel: () => void
   submitLabel: string
   onPreviewAttachment?: (att: AttachmentOut) => void
+  shoppingListId?: string | null
+  onViewShoppingList?: () => void
 }
 
 function periodDateRange(p: Period | null) {
@@ -480,6 +612,7 @@ function ExpenseForm({
   initial, expenseId, categories, openPeriod, amountStep = '0.01', currency: _currency,
   defaultResponsible = '',
   onSubmit, onCancel, submitLabel, onPreviewAttachment,
+  shoppingListId, onViewShoppingList,
 }: ExpenseFormProps) {
   const today = new Date().toISOString().slice(0, 10)
   const { min: dateMin, max: dateMax } = periodDateRange(openPeriod)
@@ -493,6 +626,8 @@ function ExpenseForm({
   const [pending, setPending]       = useState<PendingFile | null>(null)
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState<string | null>(null)
+  const [ocrAnalyzing, setOcrAnalyzing] = useState(false)
+  const [ocrProposal, setOcrProposal]   = useState<OcrPreview | null>(null)
   const [localCats, setLocalCats]           = useState<UserCategory[]>(categories)
   const [refreshingCats, setRefreshingCats] = useState(false)
   const [showNewCat, setShowNewCat]         = useState(false)
@@ -531,6 +666,29 @@ function ExpenseForm({
 
   const activeCats = localCats.filter(c => c.active)
   const canSubmit = !!openPeriod
+
+  function applyOcrProposal(p: OcrPreview) {
+    if (p.amount)      setAmount(fmtAmountInput(p.amount, amountStep))
+    if (p.category_id) setCategoryId(p.category_id)
+  }
+
+  async function handleOcrAttach(file: File) {
+    setOcrAnalyzing(true)
+    try {
+      const result = await userApi.expenses.ocrPreview(file)
+      if (!result.amount && !result.category_id) return  // nada que proponer
+
+      const currentAmount = parseFloat(parseAmountInput(amount, amountStep) || '0')
+      const hasData = currentAmount > 0 || !!categoryId
+
+      if (!hasData) applyOcrProposal(result)
+      else           setOcrProposal(result)
+    } catch {
+      // Best-effort: si el OCR falla, el usuario igual puede llenar el formulario a mano.
+    } finally {
+      setOcrAnalyzing(false)
+    }
+  }
 
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     const v = e.target.value.replace(',', '.')
@@ -577,12 +735,24 @@ function ExpenseForm({
   const btnBase = 'flex-1 rounded-xl py-2.5 text-sm font-medium transition-colors'
 
   return (
+    <>
     <form onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_220px]">
 
         {/* Columna izquierda: Fecha → Monto → Categoría → Descripción → Responsable|Obviable → Estado pago */}
         <div className="space-y-4">
           <PeriodIndicator openPeriod={openPeriod} />
+
+          {shoppingListId && (
+            <button
+              type="button"
+              onClick={onViewShoppingList}
+              className="flex w-full items-center gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-left text-sm text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+            >
+              <ShoppingCart size={14} className="shrink-0" />
+              Este egreso viene de una lista de compra — ver detalle
+            </button>
+          )}
 
           {/* Fecha | Monto */}
           <div className="grid grid-cols-2 gap-4">
@@ -705,19 +875,12 @@ function ExpenseForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Responsable</label>
-              <input
-                list="responsible-datalist"
+              <ResponsibleCombobox
                 value={responsible}
-                onChange={e => setResponsible(e.target.value)}
-                placeholder="Ej: familia"
-                className={inputCls}
-                autoComplete="off"
+                options={responsibleTags}
+                onChange={setResponsible}
+                inputClassName={inputCls}
               />
-              <datalist id="responsible-datalist">
-                {responsibleTags.map(tag => (
-                  <option key={tag} value={tag} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className={labelCls}>Obviable</label>
@@ -767,6 +930,7 @@ function ExpenseForm({
             pendingFile={pending}
             onPendingChange={setPending}
             onPreviewUploaded={onPreviewAttachment ?? (() => {})}
+            onNewPendingFile={handleOcrAttach}
           />
         </div>
       </div>
@@ -785,6 +949,47 @@ function ExpenseForm({
         </button>
       </div>
     </form>
+
+    {/* Overlay: analizando imagen con OCR (cubre el modal de nuevo egreso) */}
+    {ocrAnalyzing && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-slate-900 px-8 py-6 shadow-xl">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+          <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Analizando imagen…</p>
+        </div>
+      </div>
+    )}
+
+    {/* Overlay: la imagen propone datos distintos a los ya cargados — confirmar reemplazo */}
+    {ocrProposal && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
+          <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
+            El formulario ya tiene datos cargados. La imagen sugiere{' '}
+            {ocrProposal.amount && <>monto <span className="font-semibold text-gray-900 dark:text-slate-100">{fmtMoney(Number(ocrProposal.amount), _currency)}</span></>}
+            {ocrProposal.amount && ocrProposal.category_name && ' y '}
+            {ocrProposal.category_name && <>categoría <span className="font-semibold text-gray-900 dark:text-slate-100">{ocrProposal.category_name}</span></>}
+            . ¿Quieres reemplazar lo que ya ingresaste?
+          </p>
+          <div className="mt-5 flex gap-3">
+            <button
+              onClick={() => setOcrProposal(null)}
+              className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Mantener lo actual
+            </button>
+            <button
+              onClick={() => { applyOcrProposal(ocrProposal); setOcrProposal(null) }}
+              className="flex-1 rounded-xl bg-primary-500 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition-colors"
+            >
+              Reemplazar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
@@ -794,18 +999,18 @@ type ModalState =
   | { type: 'create' }
   | { type: 'edit'; expense: Expense }
   | { type: 'delete'; expense: Expense }
+  | { type: 'confirm-draft'; expense: Expense }
   | { type: 'attachments'; expense: Expense; att?: AttachmentOut }
+  | { type: 'shopping-list-preview'; listId: string }
   | null
 
 type Filters = Record<string, string | string[]>
-
-const ZERO_DECIMAL_CURRENCIES = new Set(['CLP', 'CRC', 'COP', 'PYG', 'JPY', 'KRW', 'IDR', 'VND'])
 
 export function ExpensesPage() {
   const { user } = useAuth()
   const currency  = user?.currency ?? 'CRC'
   const userName  = user?.name ?? ''
-  const amountStep = ZERO_DECIMAL_CURRENCIES.has(currency) ? '1' : '0.01'
+  const amountStep = amountStepFor(currency)
   const [year, setYear]   = useState<number | null>(null)
   const [month, setMonth] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
@@ -900,13 +1105,19 @@ export function ExpensesPage() {
     return true
   }), [expenses, filters])
 
-  const total          = filtered.reduce((s, e) => s + Number(e.amount), 0)
-  const pendingCount   = filtered.filter(e => e.payment_status === 'pendiente').length
-  const saldadoCount   = filtered.filter(e => e.payment_status === 'saldado').length
-  const obviableCount  = filtered.filter(e => e.obviable).length
-  const montoPendiente = filtered.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + Number(e.amount), 0)
-  const montoSaldado   = filtered.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + Number(e.amount), 0)
-  const obviableTotal  = filtered.filter(e => e.obviable).reduce((s, e) => s + Number(e.amount), 0)
+  // La tabla sigue mostrando los borradores (con su badge) para que el usuario
+  // los revise, pero un borrador sin confirmar no cuenta en estos resúmenes —
+  // mismo criterio que dashboard/reportes/cierre de período.
+  const confirmed       = useMemo(() => filtered.filter(e => e.review_status !== 'borrador'), [filtered])
+  const draftCount      = filtered.length - confirmed.length
+
+  const total          = confirmed.reduce((s, e) => s + Number(e.amount), 0)
+  const pendingCount   = confirmed.filter(e => e.payment_status === 'pendiente').length
+  const saldadoCount   = confirmed.filter(e => e.payment_status === 'saldado').length
+  const obviableCount  = confirmed.filter(e => e.obviable).length
+  const montoPendiente = confirmed.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + Number(e.amount), 0)
+  const montoSaldado   = confirmed.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + Number(e.amount), 0)
+  const obviableTotal  = confirmed.filter(e => e.obviable).reduce((s, e) => s + Number(e.amount), 0)
 
   async function togglePayment(expense: Expense) {
     const next: 'pendiente' | 'saldado' = expense.payment_status === 'pendiente' ? 'saldado' : 'pendiente'
@@ -931,7 +1142,12 @@ export function ExpensesPage() {
     },
     {
       key: 'label', label: 'Descripción', sortable: true,
-      render: e => <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>,
+      render: e => (
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
+          {e.review_status === 'borrador' && <DraftBadge />}
+        </div>
+      ),
     },
     {
       key: 'responsible_tag', label: 'Responsable', sortable: true,
@@ -984,7 +1200,20 @@ export function ExpensesPage() {
     } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
+  async function confirmDraft(expense: Expense) {
+    try {
+      const updated = await userApi.expenses.update(expense.id, { review_status: 'confirmado' })
+      setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e))
+    } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
+  }
+
   const actions: RowAction<Expense>[] = [
+    {
+      icon:     Check,
+      label:    'Confirmar borrador',
+      disabled: e => e.review_status !== 'borrador' || !!periodClosed,
+      onClick:  expense => setModal({ type: 'confirm-draft', expense }),
+    },
     {
       icon:     Pencil,
       label:    'Editar',
@@ -1008,6 +1237,12 @@ export function ExpensesPage() {
       label:    'Ver adjunto',
       disabled: e => e.attachment_count === 0,
       onClick:  e => setModal({ type: 'attachments', expense: e }),
+    },
+    {
+      icon:     ShoppingCart,
+      label:    'Ver lista de compra',
+      disabled: e => !e.shopping_list_id,
+      onClick:  e => setModal({ type: 'shopping-list-preview', listId: e.shopping_list_id! }),
     },
     {
       icon: Trash2, label: 'Eliminar', variant: 'danger',
@@ -1062,13 +1297,21 @@ export function ExpensesPage() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard label="Total período"   amount={total}          currency={currency} count={filtered.length} />
+        <KpiCard label="Total período"   amount={total}          currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
         <KpiCard label="Monto obviable"  amount={obviableTotal}  currency={currency} count={obviableCount}   color="text-primary-600 dark:text-primary-400" />
       </div>
+
+      {draftCount > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-900/20 px-4 py-3">
+          <p className="text-sm text-purple-700 dark:text-purple-400">
+            Hay <span className="font-semibold">{draftCount}</span> {draftCount === 1 ? 'egreso en borrador' : 'egresos en borrador'} (recibidos por bot, pendientes de revisión) que no se cuentan en los totales de arriba.
+          </p>
+        </div>
+      )}
 
       {periodClosed && (
         <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 px-4 py-3">
@@ -1096,6 +1339,17 @@ export function ExpensesPage() {
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}
+        isExpandable={e => !!e.items && e.items.length > 0}
+        renderExpanded={e => (
+          <div className="max-w-xs space-y-1 pl-8">
+            {e.items!.map((item, i) => (
+              <div key={i} className="flex items-center gap-4 text-sm">
+                <span className="flex-1 text-gray-600 dark:text-slate-400">{item.label}</span>
+                <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-slate-300">{fmtMoney(Number(item.amount), currency)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       />
 
       {/* Modal: crear egreso */}
@@ -1135,6 +1389,8 @@ export function ExpensesPage() {
             submitLabel="Guardar"
             onCancel={() => setModal(null)}
             onPreviewAttachment={att => setModal({ type: 'attachments', expense: modal.expense, att })}
+            shoppingListId={modal.expense.shopping_list_id}
+            onViewShoppingList={() => setModal({ type: 'shopping-list-preview', listId: modal.expense.shopping_list_id! })}
             onSubmit={async (data) => {
               const updated = await userApi.expenses.update(modal.expense.id, data as ExpenseUpdatePayload)
               setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e))
@@ -1142,6 +1398,10 @@ export function ExpensesPage() {
             }}
           />
         </Modal>
+      )}
+
+      {modal?.type === 'shopping-list-preview' && (
+        <ShoppingListPreviewModal listId={modal.listId} currency={currency} onClose={() => setModal(null)} />
       )}
 
       {/* Modal: eliminar egreso */}
@@ -1155,6 +1415,27 @@ export function ExpensesPage() {
           <div className="mt-5 flex gap-3">
             <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
             <button onClick={() => handleDelete(modal.expense)} className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors">Eliminar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'confirm-draft' && (
+        <Modal title="Confirmar borrador" onClose={() => setModal(null)}>
+          <p className="text-sm text-gray-600 dark:text-slate-400">
+            ¿Confirmar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.expense.label}"</span> del {fmtDate(modal.expense.date)} por{' '}
+            <span className="font-semibold">{fmtMoney(Number(modal.expense.amount), currency)}</span> como egreso definitivo?
+          </p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+            Revisa el monto y la categoría antes de confirmar — a partir de acá cuenta en los totales del período.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+            <button
+              onClick={async () => { await confirmDraft(modal.expense); setModal(null) }}
+              className="flex-1 rounded-xl bg-primary-500 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition-colors"
+            >
+              Confirmar
+            </button>
           </div>
         </Modal>
       )}

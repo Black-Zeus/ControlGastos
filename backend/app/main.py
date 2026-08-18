@@ -8,6 +8,7 @@ from app.database import AsyncSessionLocal
 from app.seed import seed_system_catalogs
 from app.routers import auth, admin, catalog, ingestion
 from app.routers import expenses, incomes, periods, attachments, profile, recovery, reports
+from app.routers import shopping_lists
 
 settings = get_settings()
 
@@ -26,7 +27,7 @@ _openapi_url = "/api/openapi.json" if settings.debug else None
 
 app = FastAPI(
     title="ControlGastos API",
-    version="0.1.0",
+    version="0.3.0",
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,
@@ -67,6 +68,7 @@ app.include_router(attachments.router, prefix=PREFIX)
 app.include_router(profile.router,    prefix=PREFIX)
 app.include_router(recovery.router,   prefix=PREFIX)
 app.include_router(reports.router,    prefix=PREFIX)
+app.include_router(shopping_lists.router, prefix=PREFIX)
 
 
 @app.get("/api/health")

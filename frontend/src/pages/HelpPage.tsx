@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { ChevronDown, HelpCircle } from 'lucide-react'
+import { useMemo, useState, type ElementType } from 'react'
+import {
+  ArrowRight, CalendarRange, ChevronDown, CircleHelp, FileText, Gauge, LayoutDashboard,
+  Search, Settings2, ShoppingCart, ShieldCheck, Wallet, Bell, Repeat2, UserRound,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import imgAbrirPeriodo from '@/assets/help/abrir-periodo-modal.png'
@@ -16,255 +19,514 @@ import imgAboutModal from '@/assets/help/about-modal.png'
 import imgPerfilNotificaciones from '@/assets/help/perfil-notificaciones.png'
 import imgReportePdfPreview from '@/assets/help/reporte-pdf-preview.png'
 
-interface Guide {
+type Guide = {
+  id: string
   title: string
+  summary: string
   image: string
   steps: string[]
+  chips: string[]
+}
+
+type Faq = {
+  q: string
+  a: string
+  image?: string
+  module: string
 }
 
 const GUIDES: Guide[] = [
   {
-    title: '1. Crear un período',
+    id: 'periodo',
+    title: '1. Abrir un período',
+    summary: 'Todo el sistema parte aquí. Sin un período abierto no debes registrar movimientos.',
     image: imgAbrirPeriodo,
+    chips: ['Inicio', 'Obligatorio'],
     steps: [
-      'Ve a "Períodos" en el menú y pulsa "Abrir período".',
-      'Es el punto de partida obligatorio: no puedes registrar ingresos ni egresos sin un período abierto.',
-      'Solo puede haber un período abierto a la vez, y se abren en orden — el sistema te propone el siguiente mes disponible.',
-      'Si ya cerraste un período antes, los egresos recurrentes y los que quedaron pendientes se trasladan automáticamente al nuevo período.',
+      'Ve a Períodos en el menú lateral.',
+      'Pulsa Abrir período.',
+      'Confirma el mes que te propone el sistema o selecciona el primer mes disponible.',
+      'Usa este paso antes de registrar ingresos, egresos o listas de compra.',
     ],
   },
   {
-    title: '2. Conocer la interfaz (Dashboard)',
+    id: 'dashboard',
+    title: '2. Leer el tablero',
+    summary: 'El dashboard resume lo que pasa dentro del período activo.',
     image: imgDashboard,
+    chips: ['Resumen', 'Lectura'],
     steps: [
-      'El Dashboard es tu pantalla de inicio: resume el período abierto en tarjetas (ingresos, egresos saldados/pendientes, dinero libre).',
-      'Más abajo verás el flujo diario del mes, egresos por categoría y el detalle por responsable.',
-      'El menú lateral izquierdo es tu punto de navegación a todo: Ingresos, Egresos, Reportes, Períodos, Catálogos y este Centro de ayuda.',
-      'Haz clic en el logo o el nombre "ControlGastos" arriba del menú para ver la versión y un resumen de funcionalidades.',
+      'Revisa el período activo en la parte superior.',
+      'Mira los totales de ingresos, egresos saldados, egresos pendientes y dinero libre.',
+      'Usa los gráficos para detectar categorías o responsables que concentran más gasto.',
+      'Toma el dashboard como punto de control antes de seguir registrando movimientos.',
     ],
   },
   {
-    title: '3. Registrar un ingreso',
+    id: 'ingresos',
+    title: '3. Registrar ingresos',
+    summary: 'Los ingresos se capturan cuando el período ya está abierto.',
     image: imgIngresos,
+    chips: ['Movimientos', 'Cobros'],
     steps: [
-      'Con un período abierto, entra a "Ingresos" en el menú lateral.',
-      'Pulsa "+ Nuevo ingreso".',
-      'Completa fecha, descripción, tipo de ingreso, monto y responsable.',
-      'Marca el estado de pago — pendiente o recibido — puedes cambiarlo después.',
+      'Entra a Ingresos desde el menú lateral.',
+      'Pulsa Nuevo ingreso.',
+      'Completa fecha, monto, descripción, tipo y responsable.',
+      'Marca si está recibido o pendiente y guarda el movimiento.',
     ],
   },
   {
-    title: '4. Registrar un egreso',
+    id: 'egresos',
+    title: '4. Registrar egresos',
+    summary: 'Los egresos siguen el mismo orden de trabajo, pero con categoría, pago y obviable.',
     image: imgEgresos,
+    chips: ['Gastos', 'Estados'],
     steps: [
-      'Entra a "Egresos" en el menú lateral.',
-      'Pulsa "+ Nuevo egreso".',
-      'Completa fecha, descripción, categoría, monto y responsable.',
-      'Marca el estado de pago — pendiente o saldado — y si es recurrente o puntual.',
-      'Si un egreso o ingreso queda "pendiente" y su fecha es mañana, te llega un correo recordatorio agrupado con todos tus compromisos del día siguiente (activable en Mi perfil → Notificaciones).',
+      'Entra a Egresos con el período abierto.',
+      'Pulsa Nuevo egreso.',
+      'Completa fecha, monto, categoría, descripción y responsable.',
+      'Define el estado de pago y si el egreso es recurrente o puntual.',
     ],
   },
   {
-    title: '5. Crear categorías y tipos de ingreso personalizados',
+    id: 'catalogos',
+    title: '5. Preparar catálogos',
+    summary: 'Las categorías y tipos ayudan a ordenar la información antes de trabajar a escala.',
     image: imgCatalogos,
+    chips: ['Catálogos', 'Base'],
     steps: [
-      'Ve a "Catálogos" en el menú.',
-      'Además de las categorías del sistema, puedes crear las tuyas propias para egresos e ingresos.',
-      'Cada categoría puede marcarse como "obviable por defecto", útil para gastos fijos que no quieres que afecten ciertos totales.',
+      'Ve a Catálogos para revisar categorías de egresos y tipos de ingreso.',
+      'Crea los valores que vas a reutilizar en el registro diario.',
+      'Mantén una nomenclatura clara para que reportes y filtros sean más consistentes.',
+      'Si vas a usar responsables recurrentes, procura que los nombres sean estables y breves.',
     ],
   },
   {
-    title: '6. Cerrar un período',
+    id: 'listas',
+    title: '6. Trabajar con listas de compra',
+    summary: 'La lista se arma antes de enviarla a egreso y después se puede seguir ajustando.',
+    image: imgEgresos,
+    chips: ['Compras', 'Egreso'],
+    steps: [
+      'Entra a Listas de compra y crea una nueva lista.',
+      'Agrega productos uno por uno con cantidad, valor unitario y observación si hace falta.',
+      'Marca los productos comprados y envía la lista a egreso.',
+      'Si agregas más productos después, vuelve a enviarla para actualizar el egreso existente.',
+    ],
+  },
+  {
+    id: 'cierre',
+    title: '7. Cerrar y reabrir períodos',
+    summary: 'El cierre consolida el mes y la reapertura sirve para correcciones puntuales.',
     image: imgPeriodos,
+    chips: ['Cierre', 'Reapertura'],
     steps: [
-      'Cuando el mes esté completo, ve a "Períodos" y pulsa "Cerrar período".',
-      'Se calcula el balance final y se genera automáticamente el reporte en PDF.',
-      'Te llega un correo con el resumen (ingresos, egresos, balance) y el PDF adjunto — el mismo que puedes ver o descargar después desde "Períodos" con el botón "Ver reporte".',
-      'Una vez cerrado, ya puedes abrir el período siguiente.',
+      'Cuando el mes esté completo, vuelve a Períodos.',
+      'Expande la tarjeta del período para ver Cerrar período o Reabrir si ya está cerrado.',
+      'Al cerrar, el sistema genera el reporte y prepara el siguiente período disponible.',
+      'Al reabrir, haces correcciones y luego vuelves a cerrar.',
     ],
   },
   {
-    title: '7. Reabrir un período',
-    image: imgReabrirPeriodo,
-    steps: [
-      'Solo se puede reabrir el período cerrado más reciente (no uno más antiguo), y solo si no tienes otro período abierto en este momento.',
-      'En "Períodos", expande el período cerrado y pulsa "Reabrir".',
-      'El reporte PDF de ese período se elimina y los totales se recalculan — te llega un correo avisando que fue reabierto.',
-      'Haz tus ajustes y vuelve a cerrarlo cuando termines.',
-    ],
-  },
-  {
-    title: 'Revisar tus reportes',
+    id: 'reportes',
+    title: '8. Revisar reportes',
+    summary: 'Los reportes muestran comparación, tendencia y desglose por categoría.',
     image: imgReportes,
+    chips: ['Análisis', 'PDF'],
     steps: [
-      'En "Reportes" encuentras tres vistas: Comparación, Tendencia y Por categoría.',
-      '"Comparación" contrasta dos períodos lado a lado.',
-      '"Tendencia" muestra la evolución mes a mes.',
-      '"Por categoría" desglosa en qué se va la plata.',
+      'Abre Reportes desde el menú lateral.',
+      'Usa Comparación para contrastar períodos.',
+      'Usa Tendencia para ver evolución mes a mes.',
+      'Usa Por categoría para revisar en qué se está yendo el gasto.',
     ],
   },
   {
-    title: 'Recuperar tu contraseña olvidada',
-    image: imgForgotPassword,
-    steps: [
-      'En la pantalla de inicio de sesión, pulsa "¿Olvidaste tu contraseña?".',
-      'Ingresa tu correo — te llegará un código de verificación de 6 dígitos.',
-      'Ingresa el código recibido para confirmar tu identidad.',
-      'Define tu nueva contraseña (con la barra de fortaleza como guía) y ya puedes iniciar sesión con ella.',
-    ],
-  },
-  {
-    title: 'Configurar tu perfil, seguridad y notificaciones',
+    id: 'perfil',
+    title: '9. Configurar perfil',
+    summary: 'Desde Perfil se ajustan datos personales, seguridad y notificaciones.',
     image: imgPerfil,
+    chips: ['Perfil', 'Seguridad'],
     steps: [
-      'Entra a "Mi perfil" desde el menú de usuario, abajo a la izquierda.',
-      'En "Información personal" ajustas tu moneda y zona horaria.',
-      'En "Seguridad" puedes cambiar tu contraseña — una barra de fortaleza te indica qué tan segura es mientras escribes.',
-      'En "Notificaciones" activas o desactivas los recordatorios diarios de compromisos pendientes y eliges la hora de envío.',
+      'Haz clic en tu nombre en el menú lateral.',
+      'Actualiza nombre, moneda, zona horaria y avatar si corresponde.',
+      'Cambia tu contraseña en la sección Seguridad.',
+      'Activa o desactiva recordatorios y fija la hora de notificación.',
     ],
   },
 ]
-
-interface Faq {
-  q: string
-  a: string
-  image?: string
-}
 
 const FAQS: Faq[] = [
   {
-    q: '¿Cómo cambio mi contraseña?',
-    a: 'Qué es: el formulario de seguridad de tu cuenta, dentro de tu perfil. Para qué sirve: actualizar la clave con la que inicias sesión, algo que conviene hacer periódicamente o si sospechas que alguien más la conoce. Cómo se hace: ve a Mi perfil → Seguridad, ingresa tu contraseña actual y la nueva dos veces — una barra de fortaleza te muestra qué tan segura es a medida que escribes, y el botón de ojo te deja verla mientras la tipeas.',
-  },
-  {
-    q: '¿Qué pasa si reabro un período ya cerrado?',
-    a: 'Qué es: una acción de reversión sobre el cierre mensual. Para qué sirve: corregir un egreso o ingreso que olvidaste registrar antes de cerrar, sin tener que esperar al mes siguiente. Cómo se hace: en "Períodos", expande el período cerrado más reciente (solo ese puede reabrirse, y solo si no tienes otro período abierto) y pulsa "Reabrir". El reporte PDF de ese período se elimina, los totales se recalculan y te llega un correo avisando que fue reabierto. Haz tus ajustes y vuelve a cerrarlo cuando termines.',
-    image: imgReabrirPeriodo,
-  },
-  {
-    q: '¿Recibo algún correo cuando cierro un período?',
-    a: 'Qué es: una notificación automática por email. Para qué sirve: tener un respaldo del cierre mensual sin tener que entrar a la app, y poder compartir o archivar el resumen. Cómo se activa: no requiere configuración — ocurre automáticamente cada vez que pulsas "Cerrar período" en "Períodos". El correo trae el resumen (ingresos, egresos y balance) y el reporte en PDF adjunto, el mismo que puedes volver a ver o descargar después con el botón "Ver reporte".',
-    image: imgReportePdfPreview,
-  },
-  {
     q: '¿Cómo recupero mi contraseña si la olvidé?',
-    a: 'Qué es: el flujo de recuperación de acceso cuando no puedes iniciar sesión. Para qué sirve: recobrar el acceso a tu cuenta sin depender de un administrador. Cómo se hace: en la pantalla de inicio de sesión, pulsa "¿Olvidaste tu contraseña?", ingresa tu correo y te llegará un código de 6 dígitos. Con ese código confirmas tu identidad y defines una nueva contraseña.',
+    a: 'En la pantalla de inicio pulsa ¿Olvidaste tu contraseña?, ingresa tu correo, valida el código de 6 dígitos y define una nueva clave.',
     image: imgForgotPassword,
+    module: 'Acceso',
   },
   {
-    q: '¿Me avisan si mi contraseña cambia?',
-    a: 'Qué es: una alerta de seguridad por email. Para qué sirve: que te enteres de inmediato si tu contraseña cambió sin que lo hicieras tú — la primera señal de una cuenta comprometida. Cómo se activa: no requiere configuración, se envía automáticamente cada vez que la contraseña se actualiza, ya sea por ti o, en el caso de un administrador, por otra persona. Si no reconoces el cambio, contacta al administrador de inmediato.',
+    q: '¿Qué pasa cuando cierro un período?',
+    a: 'El mes queda consolidado, se genera el reporte PDF y se prepara el siguiente período operativo. Los movimientos pendientes pueden arrastrarse según su estado.',
+    image: imgReportePdfPreview,
+    module: 'Períodos',
   },
   {
-    q: '¿Cómo activo los recordatorios diarios por correo?',
-    a: 'Qué es: un resumen diario de compromisos financieros por email. Para qué sirve: que no se te pase pagar (o cobrar) algo que anotaste como pendiente. Cómo se activa: en Mi perfil → Notificaciones, activa el interruptor y elige la hora de envío. Recibirás un correo el día anterior a cada egreso o ingreso marcado como "pendiente", con todos los compromisos del día siguiente agrupados.',
+    q: '¿Qué pasa si reabro un período?',
+    a: 'Se habilita nuevamente ese mes para correcciones. Luego puedes volver a cerrarlo y regenerar el resumen mensual.',
+    image: imgReabrirPeriodo,
+    module: 'Períodos',
+  },
+  {
+    q: '¿Cómo activo los recordatorios diarios?',
+    a: 'En Mi perfil, sección Notificaciones, activa el interruptor y define la hora. Recibirás avisos para movimientos pendientes del día siguiente.',
     image: imgPerfilNotificaciones,
+    module: 'Perfil',
   },
   {
-    q: '¿Qué significa marcar un egreso como "obviable"?',
-    a: 'Qué es: una marca opcional al registrar un egreso. Para qué sirve: identificar gastos que no quieres que se cuenten en ciertos totales o resúmenes — por ejemplo, un gasto recurrente que ya llevas contabilizado por otro lado y no quieres que "infle" tus cifras del mes. Cómo se activa: al crear o editar un egreso, marca la casilla "Obviable"; puedes cambiarla en cualquier momento.',
+    q: '¿Puedo asignar un responsable a cada movimiento?',
+    a: 'Sí. Responsable es una etiqueta opcional que ayuda a filtrar y a entender quién administra o genera cada registro.',
+    module: 'Movimientos',
   },
   {
-    q: '¿Qué diferencia hay entre "pendiente" y "saldado" / "recibido"?',
-    a: 'Qué es: el estado de pago de cada registro. Para qué sirve: distinguir lo que ya se pagó/cobró de lo que todavía está en el aire, para que el balance del período y los recordatorios diarios reflejen tu situación real. Cómo se usa: un egreso "pendiente" aún no se ha pagado, uno "saldado" sí; para ingresos el equivalente es "pendiente" y "recibido". Puedes cambiar el estado en cualquier momento desde la lista de Egresos o Ingresos.',
+    q: '¿Qué significa marcar un egreso como obviable?',
+    a: 'Sirve para identificar gastos que no quieres considerar en ciertos totales o resúmenes. Puedes activarlo al crear o editar un egreso.',
+    module: 'Movimientos',
   },
   {
-    q: '¿Puedo asignar un responsable a cada egreso o ingreso?',
-    a: 'Qué es: una etiqueta de texto libre en cada registro. Para qué sirve: separar gastos e ingresos compartidos entre varias personas del hogar y ver el detalle "Por responsable" en el Dashboard. Cómo se hace: al crear o editar un egreso o ingreso, completa el campo "Responsable" (es opcional).',
-  },
-  {
-    q: '¿Dónde veo la versión de la aplicación y qué cubre?',
-    a: 'Qué es: un modal informativo "Acerca de ControlGastos". Para qué sirve: consultar rápidamente la versión instalada y un resumen de las funcionalidades del sistema. Cómo se activa: haz clic en el logo o el nombre "ControlGastos" en la parte superior del menú lateral, en la vista de usuario o en la de administración.',
+    q: '¿Dónde veo la versión y el resumen de la aplicación?',
+    a: 'En el modal Acerca de ControlGastos, accesible desde el logo o el nombre de la aplicación en el menú lateral.',
     image: imgAboutModal,
+    module: 'Sistema',
   },
 ]
 
-function GuideCard({ guide }: { guide: Guide }) {
+function StepList({ steps }: { steps: string[] }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-soft">
-      <img src={guide.image} alt={guide.title} className="w-full border-b border-gray-100 dark:border-slate-800" />
-      <div className="p-6">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</h3>
-        <ol className="space-y-2">
-          {guide.steps.map((step, i) => (
-            <li key={i} className="flex gap-2.5 text-sm text-gray-600 dark:text-slate-400">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-900/30 text-[11px] font-semibold text-primary-700 dark:text-primary-400">
-                {i + 1}
-              </span>
-              <span className="leading-relaxed">{step}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
+    <ol className="space-y-3">
+      {steps.map((step, index) => (
+        <li key={step} className="flex gap-3 text-sm leading-relaxed text-gray-600 dark:text-slate-300">
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-50 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            {index + 1}
+          </span>
+          <span>{step}</span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
-function FaqItem({ q, a, image }: Faq) {
-  const [open, setOpen] = useState(false)
+function GuideBadge({ id }: { id: string }) {
+  const map: Record<string, ElementType> = {
+    periodo: CalendarRange,
+    dashboard: LayoutDashboard,
+    ingresos: Wallet,
+    egresos: ShoppingCart,
+    catalogos: Settings2,
+    listas: Repeat2,
+    cierre: FileText,
+    reportes: Gauge,
+    perfil: UserRound,
+  }
+  const Icon = map[id] ?? CircleHelp
+  return <Icon size={16} />
+}
+
+function GuideCard({ guide }: { guide: Guide }) {
   return (
-    <div className="border-b border-gray-100 dark:border-slate-800 last:border-0">
+    <article id={guide.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+      <img src={guide.image} alt={guide.title} className="h-56 w-full border-b border-gray-100 object-cover dark:border-slate-800" />
+      <div className="space-y-4 p-6">
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {guide.chips.map(chip => (
+              <span key={chip} className="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                {chip}
+              </span>
+            ))}
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">{guide.title}</h3>
+          <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{guide.summary}</p>
+        </div>
+        <StepList steps={guide.steps} />
+      </div>
+    </article>
+  )
+}
+
+function FaqItem({ faq }: { faq: Faq }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <article className="border-b border-gray-100 last:border-0 dark:border-slate-800">
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="flex w-full items-center justify-between gap-4 py-4 text-left"
+        className="flex w-full items-start justify-between gap-4 py-4 text-left"
       >
-        <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{q}</span>
-        <ChevronDown
-          size={16}
-          className={cn('shrink-0 text-gray-400 transition-transform dark:text-slate-500', open && 'rotate-180')}
-        />
+        <span className="min-w-0">
+          <span className="mb-1 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+            {faq.module}
+          </span>
+          <span className="block text-sm font-medium text-gray-800 dark:text-slate-200">{faq.q}</span>
+        </span>
+        <ChevronDown size={16} className={cn('mt-1 shrink-0 text-gray-400 transition-transform dark:text-slate-500', open && 'rotate-180')} />
       </button>
+
       {open && (
-        <div className="flex flex-col gap-4 pb-4 pr-8">
-          <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{a}</p>
-          {image && (
+        <div className="space-y-4 pb-5">
+          <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{faq.a}</p>
+          {faq.image && (
             <img
-              src={image}
-              alt={q}
-              className="mx-auto w-full max-w-xl rounded-xl border border-gray-100 dark:border-slate-800"
+              src={faq.image}
+              alt={faq.q}
+              className="w-full rounded-2xl border border-gray-100 object-cover dark:border-slate-800"
             />
           )}
         </div>
       )}
-    </div>
+    </article>
   )
 }
 
 export function HelpPage() {
+  const [query, setQuery] = useState('')
+
+  const normalizedQuery = query.trim().toLowerCase()
+
+  const filteredGuides = useMemo(() => {
+    if (!normalizedQuery) return GUIDES
+    return GUIDES.filter(guide => (
+      guide.title.toLowerCase().includes(normalizedQuery) ||
+      guide.summary.toLowerCase().includes(normalizedQuery) ||
+      guide.steps.some(step => step.toLowerCase().includes(normalizedQuery))
+    ))
+  }, [normalizedQuery])
+
+  const filteredFaqs = useMemo(() => {
+    if (!normalizedQuery) return FAQS
+    return FAQS.filter(faq => (
+      faq.q.toLowerCase().includes(normalizedQuery) ||
+      faq.a.toLowerCase().includes(normalizedQuery) ||
+      faq.module.toLowerCase().includes(normalizedQuery)
+    ))
+  }, [normalizedQuery])
+
+  const navItems = [
+    { label: 'Abrir período', icon: CalendarRange, href: '#periodo' },
+    { label: 'Dashboard', icon: LayoutDashboard, href: '#dashboard' },
+    { label: 'Ingresos', icon: Wallet, href: '#ingresos' },
+    { label: 'Egresos', icon: ShoppingCart, href: '#egresos' },
+    { label: 'Catálogos', icon: Settings2, href: '#catalogos' },
+    { label: 'Listas', icon: Repeat2, href: '#listas' },
+    { label: 'Cierre', icon: FileText, href: '#cierre' },
+    { label: 'Reportes', icon: Gauge, href: '#reportes' },
+    { label: 'Perfil', icon: UserRound, href: '#perfil' },
+  ]
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-slate-100">
-          <HelpCircle size={20} className="text-primary-500" />
-          Centro de ayuda
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-          Guías paso a paso y respuestas a las preguntas más comunes sobre ControlGastos.
-        </p>
-      </div>
+      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid gap-0 lg:grid-cols-[1.5fr_0.9fr]">
+          <div className="space-y-5 p-6 sm:p-8">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+              <CircleHelp size={14} />
+              Centro de ayuda
+            </div>
+            <div className="space-y-3">
+              <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 sm:text-4xl">
+                Guías operativas ordenadas por flujo real de trabajo
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-gray-500 dark:text-slate-400">
+                Esta versión reorganiza la ayuda para enseñar primero lo que necesitas habilitar, luego lo que debes registrar,
+                y al final cómo cerrar, revisar y corregir. Las imágenes se mantienen como apoyo visual.
+              </p>
+            </div>
 
-      <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
-          Guías paso a paso
-        </h2>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {GUIDES.map(guide => (
-            <GuideCard key={guide.title} guide={guide} />
-          ))}
-        </div>
-      </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <label className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+                <Search size={16} className="shrink-0 text-gray-400" />
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Buscar por módulo, acción o pregunta"
+                  className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+              </label>
+            </div>
+          </div>
 
-      <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
-          Preguntas frecuentes
-        </h2>
-        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-soft px-6">
-          {FAQS.map(faq => (
-            <FaqItem key={faq.q} {...faq} />
-          ))}
+          <aside className="border-t border-gray-100 bg-gray-50 p-6 dark:border-slate-800 dark:bg-slate-950/40 lg:border-l lg:border-t-0">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-slate-500">
+                  Ruta recomendada
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+                  Sigue este orden para que la documentación respete el uso real del sistema.
+                </p>
+              </div>
+
+              <nav className="grid gap-2">
+                {navItems.map(item => {
+                  const Icon = item.icon
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      className="flex items-center justify-between rounded-2xl border border-transparent bg-white px-3 py-2.5 text-sm text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/20"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon size={15} className="text-primary-500" />
+                        {item.label}
+                      </span>
+                      <ArrowRight size={14} className="text-gray-300" />
+                    </a>
+                  )
+                })}
+              </nav>
+            </div>
+          </aside>
         </div>
-      </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="space-y-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
+                Orden sugerido
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                Se priorizan dependencias antes de enseñar movimientos.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {GUIDES.map(guide => (
+                <a
+                  key={guide.id}
+                  href={`#${guide.id}`}
+                  className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-soft transition-colors hover:border-primary-200 hover:bg-primary-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/20"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                    <GuideBadge id={guide.id} />
+                  </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</p>
+                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{guide.summary}</p>
+                </div>
+                <ArrowRight size={16} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5" />
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-gray-100 px-6 py-4 dark:border-slate-800">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
+              Tópicos
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              Cada bloque explica qué hacer, cómo hacerlo y qué orden seguir.
+            </p>
+          </div>
+          <div className="grid gap-4 p-6 sm:grid-cols-2">
+            {GUIDES.map(guide => (
+              <div key={guide.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                    <ShieldCheck size={16} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">{guide.chips.join(' · ')}</p>
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{guide.summary}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            Guías paso a paso
+          </h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+            Cada guía sigue un orden lógico de uso. Si un paso depende de otro, ese requisito aparece primero.
+          </p>
+        </div>
+
+        <div className="grid gap-6">
+          {filteredGuides.length > 0 ? (
+            filteredGuides.map(guide => <GuideCard key={guide.id} guide={guide} />)
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-500 shadow-soft dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+              No hay resultados para la búsqueda actual.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-gray-100 px-6 py-4 dark:border-slate-800">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
+              Preguntas frecuentes
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              Respuestas cortas y directas para consultas de uso frecuente.
+            </p>
+          </div>
+          <div className="px-6">
+            {filteredFaqs.length > 0 ? (
+              filteredFaqs.map(faq => <FaqItem key={faq.q} faq={faq} />)
+            ) : (
+              <div className="py-8 text-center text-sm text-gray-500 dark:text-slate-400">
+                No hay preguntas que coincidan con tu búsqueda.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Orden sugerido para enseñar el sistema</h3>
+            <div className="mt-4 space-y-3">
+              {[
+                'Abrir período.',
+                'Leer el dashboard.',
+                'Registrar ingresos y egresos.',
+                'Trabajar listas de compra.',
+                'Cerrar o reabrir períodos.',
+                'Revisar reportes.',
+                'Ajustar perfil, avatar, contraseña y recordatorios.',
+              ].map((item, index) => (
+                <div key={item} className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-3 dark:bg-slate-950/30">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-50 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                    {index + 1}
+                  </span>
+                  <p className="text-sm leading-relaxed text-gray-600 dark:text-slate-300">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 shadow-soft dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="flex items-start gap-3">
+              <Bell size={18} className="mt-0.5 text-primary-500" />
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Criterio de edición</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-slate-400">
+                  Si una explicación depende de una condición previa, esa condición debe aparecer antes. Esto evita enseñar
+                  a registrar egresos antes de abrir un período, o a usar reportes antes de tener datos cargados.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

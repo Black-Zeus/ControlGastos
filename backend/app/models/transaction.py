@@ -8,7 +8,7 @@ from sqlalchemy import (
     Enum as SAEnum, ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 from app.models.base import Base, uuid_pk, created_at_col
 
@@ -78,6 +78,7 @@ class Expense(Base):
         Index("ix_expenses_user_date", "user_id", "date"),
         Index("ix_expenses_user_review", "user_id", "review_status"),
         Index("ix_expenses_period_id", "period_id"),
+        Index("ix_expenses_shopping_list_id", "shopping_list_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -106,6 +107,11 @@ class Expense(Base):
     carry_forward: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     observation: Mapped[str | None] = mapped_column(Text, nullable=True)
     responsible_tag: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Desglose de ítems (snapshot congelado — ver ShoppingList para la plantilla viva y editable).
+    items: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    shopping_list_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("shopping_lists.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = created_at_col()
 
     user: Mapped["User"] = relationship("User", back_populates="expenses")

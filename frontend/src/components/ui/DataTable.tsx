@@ -1,4 +1,4 @@
-import { useState, useEffect, type ElementType } from 'react'
+import { useState, useEffect, Fragment, type ElementType } from 'react'
 import {
   ChevronUp, ChevronDown, ChevronsUpDown,
   ChevronLeft, ChevronRight,
@@ -36,6 +36,10 @@ interface DataTableProps<T> {
   loading?: boolean
   emptyMessage?: string
   className?: string
+  /** Si se provee, agrega una columna de expansión a la izquierda. Solo se muestra el chevron en filas donde esto retorna true. */
+  isExpandable?: (row: T) => boolean
+  /** Contenido de la fila expandida (sub-tabla indentada, detalle, etc.), ocupa el ancho completo. */
+  renderExpanded?: (row: T) => React.ReactNode
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,11 +67,23 @@ export function DataTable<T>({
   loading = false,
   emptyMessage = 'Sin resultados',
   className,
+  isExpandable,
+  renderExpanded,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey]   = useState<string | null>(null)
   const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('asc')
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(defaultPageSize)
+  const [expanded, setExpanded] = useState<Set<string | number>>(new Set())
+
+  function toggleExpanded(key: string | number) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   // Resetear página cuando cambian los datos
   useEffect(() => { setPage(1) }, [data, pageSize])
@@ -117,6 +133,7 @@ export function DataTable<T>({
           <table className="w-full min-w-max text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-slate-800">
+                {renderExpanded && <th className="w-8 px-2 py-3" />}
                 {columns.map(col => (
                   <th
                     key={col.key}
@@ -152,18 +169,34 @@ export function DataTable<T>({
               {!loading && rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={columns.length + (hasActions ? 1 : 0)}
+                    colSpan={columns.length + (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0)}
                     className="py-12 text-center text-sm text-gray-400 dark:text-slate-500"
                   >
                     {emptyMessage}
                   </td>
                 </tr>
               )}
-              {rows.map((row, i) => (
+              {rows.map((row, i) => {
+                const key = rowKey(row)
+                const canExpand = renderExpanded && (!isExpandable || isExpandable(row))
+                const isOpen = canExpand && expanded.has(key)
+                return (
+                <Fragment key={key}>
                 <tr
-                  key={rowKey(row)}
                   className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors"
                 >
+                  {renderExpanded && (
+                    <td className="px-2 py-3">
+                      {canExpand && (
+                        <button
+                          onClick={() => toggleExpanded(key)}
+                          className="rounded p-0.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                        >
+                          <ChevronRight size={14} className={cn('transition-transform', isOpen && 'rotate-90')} />
+                        </button>
+                      )}
+                    </td>
+                  )}
                   {columns.map(col => (
                     <td key={col.key} className={cn('px-4 py-3', col.className)}>
                       {col.render
@@ -206,7 +239,16 @@ export function DataTable<T>({
                     </td>
                   )}
                 </tr>
-              ))}
+                {isOpen && (
+                  <tr className="bg-gray-50/60 dark:bg-slate-800/30">
+                    <td colSpan={columns.length + (hasActions ? 1 : 0) + 1} className="px-4 py-3">
+                      {renderExpanded!(row)}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

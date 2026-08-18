@@ -3,12 +3,19 @@ import type { Expense, Income } from './userApi'
 export const MONTHS       = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 export const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
+// Un borrador de ingesta (bot/OCR) todavía no es un egreso confirmado por el
+// usuario — se excluye de toda métrica agregada (dashboard, reportes, comparación).
+export function confirmedOnly(expenses: Expense[]): Expense[] {
+  return expenses.filter(e => e.review_status !== 'borrador')
+}
+
 export function calcMetrics(expenses: Expense[], incomes: Income[]) {
+  const confirmed = confirmedOnly(expenses)
   const ingresosRecibidos  = incomes.filter(i => i.payment_status === 'recibido').reduce((s, i) => s + parseFloat(i.amount), 0)
   const ingresosPendientes = incomes.filter(i => i.payment_status === 'pendiente').reduce((s, i) => s + parseFloat(i.amount), 0)
   const totalIngresos      = ingresosRecibidos + ingresosPendientes
-  const egresosSaldados    = expenses.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + parseFloat(e.amount), 0)
-  const egresosPendientes  = expenses.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + parseFloat(e.amount), 0)
+  const egresosSaldados    = confirmed.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + parseFloat(e.amount), 0)
+  const egresosPendientes  = confirmed.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + parseFloat(e.amount), 0)
   const egresosReservados  = egresosSaldados + egresosPendientes
   const dineroLibre        = ingresosRecibidos - egresosReservados
   const libreSoloPagado    = ingresosRecibidos - egresosSaldados

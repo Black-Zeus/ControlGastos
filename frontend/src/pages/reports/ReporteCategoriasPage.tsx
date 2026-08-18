@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, authToken, type Period, type Expense } from '@/lib/userApi'
-import { MONTHS_SHORT, fmtShort, CAT_COLORS } from '@/lib/reportUtils'
+import { MONTHS_SHORT, fmtShort, CAT_COLORS, confirmedOnly } from '@/lib/reportUtils'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -95,7 +95,7 @@ export function ReporteCategoriasPage() {
     try {
       const results = await Promise.all(
         toLoad.map(async p => {
-          const expenses = await userApi.expenses.list(p.year, p.month)
+          const expenses = confirmedOnly(await userApi.expenses.list(p.year, p.month))
           return { period: p, expenses, label: `${MONTHS_SHORT[p.month - 1]} ${p.year}` }
         }),
       )

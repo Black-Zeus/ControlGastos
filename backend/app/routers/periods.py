@@ -106,6 +106,9 @@ async def _get_period_totals(
             Expense.user_id == user_id,
             Expense.date >= first_day,
             Expense.date <= last_day,
+            # Un borrador de ingesta (bot/OCR) todavía no es un egreso confirmado
+            # por el usuario — no debe contar en los totales del período.
+            Expense.review_status != ReviewStatus.borrador,
         )
     )
     return Decimal(str(inc_result.scalar() or 0)), Decimal(str(exp_result.scalar() or 0))
@@ -305,10 +308,13 @@ async def close_period(
         raise HTTPException(status_code=409, detail="El período ya está cerrado")
 
     # Manejar registros pendientes antes de calcular totales
+    # (los borradores de ingesta no confirmados se excluyen — no son un
+    # egreso real todavía, no corresponde arrastrarlos ni borrarlos acá)
     pending_expenses = (await db.execute(
         select(Expense).where(
             Expense.period_id == period_id,
             Expense.payment_status == PaymentStatus.pendiente,
+            Expense.review_status != ReviewStatus.borrador,
         )
     )).scalars().all()
 
@@ -365,7 +371,10 @@ async def close_period(
         expenses = (await db.execute(
             select(Expense)
             .options(selectinload(Expense.category))
-            .where(Expense.period_id == period_id)
+            .where(
+                Expense.period_id == period_id,
+                Expense.review_status != ReviewStatus.borrador,
+            )
             .order_by(Expense.date, Expense.label)
         )).scalars().all()
 

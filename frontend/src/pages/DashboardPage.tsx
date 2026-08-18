@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, type Period, type Expense, type Income } from '@/lib/userApi'
 import { fmtMoney } from '@/components/ui/KpiCard'
+import { confirmedOnly } from '@/lib/reportUtils'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio',
                  'Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -95,12 +96,14 @@ export function DashboardPage() {
         if (!all.length) { setNoPeriod(true); setLoading(false); return }
         const p = all[0]   // más reciente, sin importar si está abierto o cerrado
         setPeriod(p)
-        const [exps, incs] = await Promise.all([
+        const [expsRaw, incs] = await Promise.all([
           userApi.expenses.list(p.year, p.month),
           userApi.incomes.list(p.year, p.month),
         ])
         if (!active) return
-        setExpenses(exps)
+        // Los borradores de ingesta (bot/OCR) sin confirmar no cuentan como
+        // egreso real todavía — se excluyen de todo el dashboard.
+        setExpenses(confirmedOnly(expsRaw))
         setIncomes(incs)
       } catch {
         if (active) setNoPeriod(true)

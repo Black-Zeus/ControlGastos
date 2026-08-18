@@ -4,7 +4,7 @@ Registro de funcionalidades pendientes y propuestas.
 
 ---
 
-## [PENDIENTE] Egresos Compuestos (desglose de ítems)
+## [EN PROGRESO] Egresos Compuestos y Listas de Compra
 
 ### Qué busca cubrir
 
@@ -17,67 +17,57 @@ ese monto es el resultado de varios ítems distintos comprados en el mismo acto 
 - Un regalo entre varias personas con distintos costos
 
 Hoy la única opción es agrupar todo bajo una descripción genérica ("Feria 28 junio") y perder
-el detalle. Esta feature permite guardar el desglose sin cambiar cómo el sistema contabiliza
-el egreso (sigue siendo un registro, una categoría, un monto total).
+el detalle. La columna `expenses.items` (JSONB) guarda ese desglose sin cambiar cómo el sistema
+contabiliza el egreso (sigue siendo un registro, una categoría, un monto total) — y sirve a **dos
+orígenes distintos**:
+
+1. **Listas de Compra** (implementado): una lista reutilizable (supermercado, feria, cumpleaños)
+   donde se van marcando productos comprados y su monto. Al "enviar a egreso" se crea un Expense
+   con `items` = snapshot de los productos comprados y `shopping_list_id` apuntando a la lista de
+   origen — pero la lista en sí **no se modifica ni se cierra**, sigue disponible para la próxima
+   compra (ver `backend/app/routers/shopping_lists.py` y `frontend/src/pages/ShoppingList*.tsx`).
+2. **Desglose manual ad-hoc** (pendiente): agregar ítems directamente desde el formulario de un
+   egreso normal, sin pasar por una lista de compra — ver "Trabajo restante" abajo.
 
 ### Concepto
 
-Un egreso puede ser **simple** (como hoy) o **compuesto** (tiene ítems internos).
-El monto del egreso compuesto equivale a la suma de sus ítems, calculado automáticamente.
+Un egreso puede ser **simple** (como hoy) o **compuesto** (tiene ítems internos, en `items`).
 Desde afuera del registro no cambia nada: mismo período, misma categoría, mismo total.
-Desde adentro: se puede expandir y ver la composición.
+Desde adentro: se puede expandir (fila expandible en Egresos, ya implementada en `DataTable`
+vía `isExpandable`/`renderExpanded`) y ver la composición.
 
 ### Integración con el sistema actual
 
 **No rompe nada existente.** El cambio es aditivo:
 - Los egresos sin ítems siguen funcionando igual
 - Los reportes y totales de período no cambian (cuentan el monto del egreso, no los ítems)
-- La API de ingesta (tokens) también puede enviar egresos compuestos
 
-### Cambios requeridos
+### Nota sobre `source` — no dupliques esta columna
 
-#### Backend
+La primera versión de esta propuesta sugería agregar `source: VARCHAR(20) nullable` a `expenses`
+para distinguir `"web"`/`"mobile"`/`"api"`. **Esto ya existe**: `expenses.source` es un enum
+Postgres (`TransactionSource`, hoy `web`/`ingestion`). Cuando la app mobile necesite distinguir su
+origen, la forma correcta es extender ese enum (`ALTER TYPE transaction_source ADD VALUE 'mobile'`
+vía migración Alembic) — no agregar una columna paralela.
 
-1. **Migración Alembic** — agregar dos columnas a la tabla `expenses`:
-   - `items: JSONB nullable` — lista de `{label: str, amount: decimal}`
-   - `source: VARCHAR(20) nullable` — origen del registro: `"web"`, `"mobile"`, `"api"`
-
-2. **Esquemas Pydantic** — extender `ExpenseCreate` / `ExpenseOut`:
-   ```python
-   class ExpenseItem(BaseModel):
-       label: str
-       amount: Decimal
-
-   class ExpenseCreate(BaseModel):
-       ...
-       items: list[ExpenseItem] | None = None
-       source: str | None = None
-   ```
-
-3. **Validación en el router** — si `items` está presente, el `amount` del egreso debe
-   coincidir con la suma de los ítems (o calcularse automáticamente en el backend).
-
-#### Frontend (web)
+### Trabajo restante — Desglose manual en el formulario de egresos
 
 1. **Formulario de nuevo/editar egreso** — sección colapsable "Desglosar en ítems":
    - Lista editable de pares (descripción, monto)
    - Botón "Agregar ítem"
    - Total calculado en tiempo real
    - Si hay ítems, el campo de monto principal se vuelve solo lectura (= suma)
-
-2. **Lista de egresos** — fila expandible:
-   - Chevron `▶` visible solo cuando el egreso tiene ítems
-   - Al expandir, muestra los ítems en una sub-tabla indentada
-   - Sin ítems: comportamiento actual sin cambios visuales
-
-3. **Vista de detalle del período** — misma lógica de expansión si se implementa en esa vista
+2. Reutiliza la columna `items` y la fila expandible que ya están implementadas — no requiere
+   tocar el esquema ni `DataTable`, solo el formulario de `ExpensesPage.tsx`.
 
 #### Mobile (React Native / Expo — pendiente de arrancar)
 
 El modelo de lista de compras en SQLite se diseña para convertirse en un egreso compuesto:
 - Lista local: `shopping_lists` + `shopping_list_items` (solo en SQLite, nunca sube)
-- Al "cerrar" la lista, crea un payload `ExpenseCreate` con `items` y `source: "mobile"`
+- Al "cerrar" la lista, crea un payload equivalente a `POST /shopping-lists/{id}/send-to-expense`
 - Se encola en la cola de sincronización y sube al servidor cuando hay conexión
+- El servidor ya tiene el modelo de datos (`ShoppingList`/`ShoppingListItem`) — el trabajo mobile
+  es sincronizar contra ese mismo esquema, no inventar uno nuevo
 
 ---
 

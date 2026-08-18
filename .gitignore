@@ -42,6 +42,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/.env.local
+*.tsbuildinfo
+
+# ── Evidencias de QA (capturas de barrido/transaccional) ──────
+evidencias-*/
 
 # ── Artefactos de terminal (bat/lsd) ─────────────────────────
 frontend/on
@@ -55,3 +59,5 @@ frontend/on
 .DS_Store
 Thumbs.db
 
+# ── Evidencais analisis ──────────────────────────────────────────────────────
+evidencias-*

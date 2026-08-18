@@ -7,12 +7,13 @@ Regla de períodos:
   - Un egreso solo puede modificarse/eliminarse si su período está abierto.
   - Si no existe período abierto, no se puede crear egresos.
 """
+import asyncio
 import uuid
 from datetime import datetime
 from datetime import date as date_cls
 from decimal import Decimal
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel
@@ -23,6 +24,8 @@ from app.models.user import User
 from app.models.transaction import Expense, Attachment, PaymentStatus, ReviewStatus, TransactionSource
 from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
+from app.models.merchant_memory import MerchantCategoryMemory
+from app.services.receipt_parsing import run_ocr, guess_amount, guess_category
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -46,6 +49,8 @@ class ExpenseOut(BaseModel):
     responsible_tag: Optional[str]
     created_at: datetime
     attachment_count: int = 0
+    shopping_list_id: Optional[uuid.UUID] = None
+    items: Optional[list[dict]] = None
 
     model_config = {"from_attributes": True}
 
@@ -123,6 +128,8 @@ def _build_out(expense: Expense, cat: Optional[Category], attachment_count: int 
         "responsible_tag":  expense.responsible_tag,
         "created_at":       expense.created_at,
         "attachment_count": attachment_count,
+        "shopping_list_id": expense.shopping_list_id,
+        "items":            expense.items,
     }
 
 
@@ -271,6 +278,9 @@ async def update_expense(
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(expense, field, value)
 
+    if expense.review_status == ReviewStatus.confirmado and expense.amount == 0:
+        raise HTTPException(status_code=400, detail="No se puede confirmar un egreso con monto $0")
+
     await db.commit()
     await db.refresh(expense)
     cat = (await db.execute(select(Category).where(Category.id == expense.category_id))).scalar_one_or_none()
@@ -294,3 +304,64 @@ async def delete_expense(
     await _assert_expense_editable(expense, db)
     await db.delete(expense)
     await db.commit()
+
+
+# ─── OCR bajo demanda (formulario "Nuevo egreso") ─────────────────────────────
+
+_OCR_ALLOWED_MIME = {"image/jpeg", "image/png"}
+_OCR_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+class OcrPreviewOut(BaseModel):
+    ocr_raw_text: str
+    amount: Optional[Decimal] = None
+    category_id: Optional[uuid.UUID] = None
+    category_name: Optional[str] = None
+
+
+@router.post("/ocr-preview", response_model=OcrPreviewOut)
+async def ocr_preview(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    OCR sincrónico para el modal "Analizando..." del formulario de nuevo egreso.
+    No persiste nada (ni Expense ni Attachment) — solo intenta leer monto y
+    categoría de la imagen para proponerlos en el formulario.
+    """
+    claimed_mime = file.content_type or ""
+    if claimed_mime not in _OCR_ALLOWED_MIME:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo se puede analizar: {', '.join(sorted(_OCR_ALLOWED_MIME))}",
+        )
+
+    content = await file.read()
+    if len(content) > _OCR_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="El archivo supera el límite de 20 MB")
+
+    loop = asyncio.get_event_loop()
+    try:
+        text = await loop.run_in_executor(None, run_ocr, content)
+    except Exception:
+        raise HTTPException(status_code=422, detail="No se pudo procesar la imagen")
+
+    amount = guess_amount(text)
+
+    categories = (await db.execute(
+        select(Category).where(
+            (Category.is_system.is_(True)) | (Category.user_id == current_user.id)
+        )
+    )).scalars().all()
+    memory = (await db.execute(
+        select(MerchantCategoryMemory).where(MerchantCategoryMemory.user_id == current_user.id)
+    )).scalars().all()
+    category = guess_category(text, categories, memory)
+
+    return OcrPreviewOut(
+        ocr_raw_text=text,
+        amount=amount,
+        category_id=category.id if category else None,
+        category_name=category.name if category else None,
+    )
