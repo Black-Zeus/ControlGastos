@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { userApi, Period, PeriodOpenOut } from '@/lib/userApi'
 import { cn } from '@/lib/utils'
+import { confirmedOnly } from '@/lib/reportUtils'
 
 interface LiveSummary {
   totalIngresos: number
@@ -717,10 +718,12 @@ export function PeriodsPage() {
       setPeriods(data)
       const openP = data.find(p => p.status === 'abierto')
       if (openP) {
-        const [expenses, incomes] = await Promise.all([
+        const [expensesRaw, incomes] = await Promise.all([
           userApi.expenses.list(openP.year, openP.month),
           userApi.incomes.list(openP.year, openP.month),
         ])
+        // Borradores de ingesta (bot/OCR) sin confirmar no cuentan como egreso real.
+        const expenses = confirmedOnly(expensesRaw)
         const totalIngresos = incomes.reduce((s, i) => s + parseFloat(i.amount), 0)
         const totalEgresos  = expenses.reduce((s, e) => s + parseFloat(e.amount), 0)
         setLiveSummary({ totalIngresos, totalEgresos, balance: totalIngresos - totalEgresos })

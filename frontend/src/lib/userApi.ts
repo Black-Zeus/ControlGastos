@@ -142,6 +142,13 @@ export interface ExpenseCreatePayload {
   responsible_tag?: string | null
 }
 
+export interface OcrPreview {
+  ocr_raw_text: string
+  amount: string | null
+  category_id: string | null
+  category_name: string | null
+}
+
 export interface ExpenseUpdatePayload {
   date?: string
   label?: string
@@ -306,6 +313,21 @@ export const userApi = {
     create: (body: ExpenseCreatePayload)                 => request<Expense>('/v1/expenses', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: ExpenseUpdatePayload)     => request<Expense>(`/v1/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string)                                 => request<void>(`/v1/expenses/${id}`, { method: 'DELETE' }),
+    ocrPreview: (file: File)                             => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return fetch(`${BASE}/v1/expenses/ocr-preview`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken()}` },
+        body: fd,
+      }).then(async r => {
+        if (!r.ok) {
+          const b = await r.json().catch(() => ({}))
+          throw new Error(b.detail ?? `Error ${r.status}`)
+        }
+        return r.json() as Promise<OcrPreview>
+      })
+    },
   },
   incomes: {
     list:   (year?: number, month?: number)              => {
