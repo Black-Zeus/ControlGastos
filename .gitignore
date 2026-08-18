@@ -59,3 +59,5 @@ frontend/on
 .DS_Store
 Thumbs.db
 
+# ── Evidencais analisis ──────────────────────────────────────────────────────
+evidencias-*
