@@ -15,6 +15,8 @@ from app.models.period import Period, PeriodStatus
 from app.models.settings import AppSetting
 from app.models.email_log import EmailLog
 from app.models.password_reset import PasswordResetToken, TokenType
+from app.models.shopping_list import ShoppingList, ShoppingListItem
+from app.models.merchant_memory import MerchantCategoryMemory
 
 __all__ = [
     "Base",
@@ -28,4 +30,6 @@ __all__ = [
     "AppSetting",
     "EmailLog",
     "PasswordResetToken", "TokenType",
+    "ShoppingList", "ShoppingListItem",
+    "MerchantCategoryMemory",
 ]
