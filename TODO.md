@@ -71,6 +71,33 @@ El modelo de lista de compras en SQLite se diseña para convertirse en un egreso
 
 ---
 
+## [EN PROGRESO] Integraciones — vinculación de canales (Telegram/WhatsApp vía n8n)
+
+Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/IntegrationsPage.tsx`
+(migración `315c19dda564`). **Aún no desplegado en producción.**
+
+### [BLOQUEANTE para desplegar] Autenticar a n8n en la ingesta por canal
+
+Hoy, una vez vinculado un canal, `/ingestion/*` (ver `_authenticate_ingestion` en
+`routers/ingestion.py`) acepta como única credencial los headers `X-Channel` + `X-Channel-Id`.
+Esos valores no son secretos (un chat_id de Telegram o un número de WhatsApp), y la API es pública
+vía Cloudflare. Cualquiera que conozca el identificador de un canal vinculado podría subir y
+confirmar recibos a nombre de ese usuario.
+
+Antes de desplegar:
+- Exigir además un secreto compartido entre n8n y el backend (p. ej. un header
+  `X-Integration-Key` validado contra una variable de entorno, comparando en tiempo constante con
+  `secrets.compare_digest`), tanto en la ingesta por canal como en `POST /channels/link`.
+- Alternativa o complemento: restringir esas rutas en nginx a la IP o red interna de n8n.
+
+### Otros pendientes
+
+- Verificar tipos y lint del frontend (`npm run build` / `npm run lint`): no se corrieron al
+  commitear.
+- Probar end-to-end con n8n en dev: código → `POST /channels/link` → recibo con headers de canal.
+
+---
+
 ## [PENDIENTE] App Mobile — React Native / Expo Lite
 
 ### Qué busca cubrir
