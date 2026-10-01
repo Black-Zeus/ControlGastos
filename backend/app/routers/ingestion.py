@@ -5,12 +5,17 @@ Flujo pensado para integraciones externas (bots de wsp/telegram vía n8n):
   1. POST /ingestion/receipts       → sube la imagen, crea Expense en borrador + Attachment.
   2. GET  /ingestion/receipts/{id}/status → polling hasta que el OCR (worker aparte) termine.
   3. POST /ingestion/receipts/{id}/confirm → confirma/corrige monto-categoría-fecha y cierra el borrador.
+
+Autenticación de este submódulo (_authenticate_ingestion): Bearer <ingestion_token>
+(clásico) O headers X-Channel + X-Channel-Id de un canal ya vinculado
+(ver app.routers.channels) — n8n puede usar cualquiera de los dos.
 """
 import asyncio
 import hashlib
 import os
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import date as date_cls, datetime
 from decimal import Decimal
 from typing import Optional
@@ -25,6 +30,7 @@ from app.models.user import User
 from app.models.ingestion import IngestionToken
 from app.models.transaction import Expense, Attachment, ReviewStatus, TransactionSource
 from app.models.catalog import Category
+from app.models.channel_link import UserChannelLink
 from app.routers.expenses import _build_out as _build_expense_out, _get_open_period, _assert_expense_editable
 from app.services.receipt_parsing import remember_merchant_category
 
@@ -110,19 +116,48 @@ async def revoke_token(
     await db.commit()
 
 
-# ─── Endpoint público de ingesta (autenticado por token) ─────────────────────
+# ─── Endpoint público de ingesta (token de ingesta O identidad de canal) ──────
 
 def _extract_ingestion_token(request: Request) -> str:
     return request.headers.get("Authorization", "").removeprefix("Bearer ")
 
 
+@dataclass
+class IngestionAuth:
+    """Resultado de _authenticate_ingestion — sin importar el esquema usado,
+    el resto del router solo necesita user_id."""
+    user_id: uuid.UUID
+    token: Optional[IngestionToken] = None
+
+
 async def _authenticate_ingestion(
+    request: Request,
     x_ingestion_token: str = Depends(_extract_ingestion_token),
     db: AsyncSession = Depends(get_db),
-) -> IngestionToken:
-    """Resuelve y valida el token de ingesta; comparte sesión de DB con el endpoint."""
+) -> IngestionAuth:
+    """
+    Dos esquemas válidos, en este orden de preferencia:
+      1. X-Channel + X-Channel-Id — canal ya vinculado (ver app.routers.channels).
+      2. Authorization: Bearer <ingestion_token> — esquema clásico.
+    """
+    channel = request.headers.get("X-Channel")
+    channel_id = request.headers.get("X-Channel-Id")
+    if channel and channel_id:
+        link = (await db.execute(
+            select(UserChannelLink).where(
+                UserChannelLink.channel == channel,
+                UserChannelLink.channel_id == channel_id,
+            )
+        )).scalar_one_or_none()
+        if not link:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Canal no vinculado a ningún usuario")
+        return IngestionAuth(user_id=link.user_id)
+
     if not x_ingestion_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de ingesta requerido")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Se requiere token de ingesta o identidad de canal (X-Channel/X-Channel-Id)",
+        )
 
     token_hash = hashlib.sha256(x_ingestion_token.encode()).hexdigest()
     token = (await db.execute(
@@ -136,7 +171,7 @@ async def _authenticate_ingestion(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o revocado")
 
     token.last_used_at = datetime.utcnow()
-    return token
+    return IngestionAuth(user_id=token.user_id, token=token)
 
 
 async def _get_ingested_expense(
@@ -171,14 +206,15 @@ class ReceiptOut(BaseModel):
 async def ingest_receipt(
     file: UploadFile = File(...),
     note: str | None = Form(default=None),
-    token: IngestionToken = Depends(_authenticate_ingestion),
+    auth: IngestionAuth = Depends(_authenticate_ingestion),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Endpoint para sistemas externos (bots, automatizaciones vía n8n).
-    Autenticación: Bearer <ingestion_token> (el token en claro, no el hash).
-    Sube la imagen del recibo y crea un gasto en estado 'borrador' + su Attachment,
-    a la espera de que el worker OCR procese la imagen (ver GET .../status).
+    Autenticación: Bearer <ingestion_token>, o X-Channel/X-Channel-Id de un
+    canal ya vinculado. Sube la imagen del recibo y crea un gasto en estado
+    'borrador' + su Attachment, a la espera de que el worker OCR procese la
+    imagen (ver GET .../status).
     """
     claimed_mime = file.content_type or ""
     if claimed_mime not in ALLOWED_MIME:
@@ -193,7 +229,7 @@ async def ingest_receipt(
     if not _check_magic(content, claimed_mime):
         raise HTTPException(status_code=400, detail="El contenido del archivo no coincide con el tipo declarado")
 
-    open_period = await _get_open_period(db, token.user_id)
+    open_period = await _get_open_period(db, auth.user_id)
 
     # Obtener categoría "Otros" de sistema como fallback — debe existir (seed al startup).
     otros = (await db.execute(
@@ -203,7 +239,7 @@ async def ingest_receipt(
         raise HTTPException(status_code=500, detail="Categoría de sistema 'Otros' no encontrada")
 
     expense = Expense(
-        user_id=token.user_id,
+        user_id=auth.user_id,
         period_id=open_period.id,
         date=date_cls.today(),
         label=note or "Recibo pendiente de revisión",
@@ -218,7 +254,7 @@ async def ingest_receipt(
     await db.flush()  # asigna expense.id sin cerrar la transacción
 
     safe_name = os.path.basename(file.filename or "recibo")
-    storage_key = f"attachments/{token.user_id}/{expense.id}/{uuid.uuid4()}/{safe_name}"
+    storage_key = f"attachments/{auth.user_id}/{expense.id}/{uuid.uuid4()}/{safe_name}"
 
     from app import storage
     loop = asyncio.get_event_loop()
@@ -226,7 +262,7 @@ async def ingest_receipt(
 
     attachment = Attachment(
         expense_id=expense.id,
-        user_id=token.user_id,
+        user_id=auth.user_id,
         storage_key=storage_key,
         original_filename=safe_name,
         mime_type=claimed_mime,
@@ -265,11 +301,11 @@ class ReceiptStatusOut(BaseModel):
 @router.get("/ingestion/receipts/{expense_id}/status", response_model=ReceiptStatusOut)
 async def get_receipt_status(
     expense_id: uuid.UUID,
-    token: IngestionToken = Depends(_authenticate_ingestion),
+    auth: IngestionAuth = Depends(_authenticate_ingestion),
     db: AsyncSession = Depends(get_db),
 ):
     """Polling: consulta si el worker OCR ya procesó la imagen y qué propuso (monto/categoría)."""
-    expense = await _get_ingested_expense(expense_id, token.user_id, db)
+    expense = await _get_ingested_expense(expense_id, auth.user_id, db)
 
     attachment = (await db.execute(
         select(Attachment)
@@ -336,14 +372,14 @@ class ReceiptConfirm(BaseModel):
 async def confirm_receipt(
     expense_id: uuid.UUID,
     body: ReceiptConfirm,
-    token: IngestionToken = Depends(_authenticate_ingestion),
+    auth: IngestionAuth = Depends(_authenticate_ingestion),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Confirma la propuesta del recibo (/aceptar, body vacío) o la corrige antes
     de confirmar (/modificar, con los campos a cambiar) y cierra el borrador.
     """
-    expense = await _get_ingested_expense(expense_id, token.user_id, db)
+    expense = await _get_ingested_expense(expense_id, auth.user_id, db)
     await _assert_expense_editable(expense, db)
 
     if body.category_id is not None:
@@ -377,7 +413,7 @@ async def confirm_receipt(
         .order_by(Attachment.uploaded_at.desc())
     )).scalars().first()
     if attachment and attachment.ocr_raw_text:
-        await remember_merchant_category(db, token.user_id, attachment.ocr_raw_text, expense.category_id)
+        await remember_merchant_category(db, auth.user_id, attachment.ocr_raw_text, expense.category_id)
 
     await db.commit()
     await db.refresh(expense)
@@ -392,7 +428,7 @@ async def confirm_receipt(
 @router.delete("/ingestion/receipts/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_receipt(
     expense_id: uuid.UUID,
-    token: IngestionToken = Depends(_authenticate_ingestion),
+    auth: IngestionAuth = Depends(_authenticate_ingestion),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -400,7 +436,7 @@ async def cancel_receipt(
     Attachment — solo permitido mientras siga en borrador; un recibo ya
     confirmado no se cancela por acá (se edita/elimina desde la app).
     """
-    expense = await _get_ingested_expense(expense_id, token.user_id, db)
+    expense = await _get_ingested_expense(expense_id, auth.user_id, db)
 
     attachments = (await db.execute(
         select(Attachment).where(Attachment.expense_id == expense_id)
