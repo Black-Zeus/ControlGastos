@@ -17,13 +17,37 @@ interface AdminNavItem {
   path: string
 }
 
-const ADMIN_NAV: AdminNavItem[] = [
-  { label: 'Dashboard',        icon: LayoutDashboard, path: '/admin' },
-  { label: 'Usuarios',         icon: Users,           path: '/admin/usuarios' },
-  { label: 'Categorías',       icon: Tags,            path: '/admin/categorias' },
-  { label: 'Tipos de ingreso', icon: TrendingUp,      path: '/admin/tipos-ingreso' },
-  { label: 'Tokens',           icon: KeyRound,        path: '/admin/tokens' },
-  { label: 'Configuración',    icon: Settings,        path: '/admin/configuracion' },
+interface AdminNavGroup {
+  label?: string
+  items: AdminNavItem[]
+}
+
+const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
+  {
+    items: [
+      { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
+    ],
+  },
+  {
+    label: 'Gestión',
+    items: [
+      { label: 'Usuarios', icon: Users,    path: '/admin/usuarios' },
+      { label: 'Tokens',   icon: KeyRound, path: '/admin/tokens' },
+    ],
+  },
+  {
+    label: 'Catálogos',
+    items: [
+      { label: 'Categorías',       icon: Tags,       path: '/admin/categorias' },
+      { label: 'Tipos de ingreso', icon: TrendingUp, path: '/admin/tipos-ingreso' },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { label: 'Configuración', icon: Settings, path: '/admin/configuracion' },
+    ],
+  },
 ]
 
 interface AdminSidebarContentProps {
@@ -89,42 +113,54 @@ function AdminSidebarContent({ collapsed, onToggleCollapsed, onCloseMobile, onOp
       <div className="mx-4 h-px bg-slate-700" />
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {ADMIN_NAV.map(item => {
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === '/admin'}
-              onClick={onCloseMobile}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary-500/20 text-primary-400'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white',
-                  collapsed && 'justify-center px-2',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon size={17} className={cn('shrink-0', isActive ? 'text-primary-400' : 'text-slate-400')} />
-                  <span
-                    className={cn(
-                      'fade-text overflow-hidden whitespace-nowrap',
-                      collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
-                    )}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {ADMIN_NAV_GROUPS.map((group, gi) => (
+          <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
+            {group.label && !collapsed && (
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                {group.label}
+              </p>
+            )}
+            {gi > 0 && collapsed && <div className="my-2 mx-1 h-px bg-slate-700" />}
+            <div className="space-y-0.5">
+              {group.items.map(item => {
+                const Icon = item.icon
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/admin'}
+                    onClick={onCloseMobile}
+                    title={collapsed ? item.label : undefined}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary-500/20 text-primary-400'
+                          : 'text-slate-300 hover:bg-slate-700 hover:text-white',
+                        collapsed && 'justify-center px-2',
+                      )
+                    }
                   >
-                    {item.label}
-                  </span>
-                </>
-              )}
-            </NavLink>
-          )
-        })}
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={17} className={cn('shrink-0', isActive ? 'text-primary-400' : 'text-slate-400')} />
+                        <span
+                          className={cn(
+                            'fade-text overflow-hidden whitespace-nowrap',
+                            collapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100',
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
