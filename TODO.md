@@ -4,6 +4,32 @@ Registro de funcionalidades pendientes y propuestas.
 
 ---
 
+## [PENDIENTE] Egresos — mejoras de UX
+
+### Columna de acciones sobrecargada
+
+La columna de acciones de la tabla de Egresos (`frontend/src/pages/ExpensesPage.tsx`) tiene
+demasiados botones por fila y se ve mal, sobre todo en pantallas angostas. Buscar una mejora
+visual; la opción candidata (aún no decidida) es dejar visibles solo las 1–2 acciones más usadas y
+mover el resto a un menú desplegable ("⋯") basado en las primitivas Radix de `components/ui/`.
+
+### Selección múltiple y acciones masivas
+
+Permitir marcar varios egresos (checkbox por fila + "seleccionar todos" sobre lo filtrado) y
+aplicar una acción en bloque. Caso principal: **confirmar todos los borradores** de una vez
+(egresos en borrador que vienen de la ingesta/OCR). Otras candidatas: marcar como saldado o
+pendiente y eliminar.
+
+- Frontend: `DataTable` no soporta selección hoy; hay que agregarla sin romper las filas
+  expandibles (`isExpandable`/`renderExpanded`).
+- Backend: evaluar un endpoint bulk (p. ej. `POST /expenses/bulk` con `ids` + `action`) en vez de N
+  llamadas, respetando las reglas de período (solo egresos de un período abierto) y devolviendo el
+  resultado por ítem para informar cuáles fallaron.
+- Confirmar un borrador exige monto, categoría y fecha válidos: definir qué pasa con los que no los
+  tienen (omitirlos e informarlos, o bloquear la acción).
+
+---
+
 ## [EN PROGRESO] Egresos Compuestos y Listas de Compra
 
 ### Qué busca cubrir
@@ -49,6 +75,21 @@ para distinguir `"web"`/`"mobile"`/`"api"`. **Esto ya existe**: `expenses.source
 Postgres (`TransactionSource`, hoy `web`/`ingestion`). Cuando la app mobile necesite distinguir su
 origen, la forma correcta es extender ese enum (`ALTER TYPE transaction_source ADD VALUE 'mobile'`
 vía migración Alembic) — no agregar una columna paralela.
+
+### Trabajo restante — Listas de Compra
+
+1. **Editar el título de la lista**: el backend ya lo soporta (`PATCH /shopping-lists/{id}` acepta
+   `name`), falta la UI en `ShoppingListDetailPage.tsx` y/o `ShoppingListsPage.tsx` (edición inline
+   o modal).
+2. **Listas siempre visibles en Egresos, saldadas solo al enviarlas**: las listas de compra deben
+   aparecer siempre en la pestaña Egresos (como gasto en curso o pendiente), y pasar a `saldado`
+   **solo** cuando se pulsa "Enviar a egreso". Hoy la lista no aparece en Egresos hasta enviarla, y
+   el envío crea el egreso directamente como `saldado`.
+   - Definir cómo se representa en Egresos antes del envío: ¿egreso `pendiente` vinculado por
+     `shopping_list_id` y actualizado al enviar, o una fila virtual que no suma a los totales?
+     Cuidar que no se dupliquen montos en los totales del período.
+   - Revisar el texto del botón y de la descripción de "Enviar a egreso" (quizá "Marcar como
+     saldado" o "Cerrar compra") para que refleje el nuevo comportamiento.
 
 ### Trabajo restante — Desglose manual en el formulario de egresos
 
@@ -137,5 +178,76 @@ Tablas: `expenses_local`, `incomes_local`, `shopping_lists`, `shopping_list_item
 - `expo-sqlite` para persistencia local
 - Zustand para estado global
 - Mismo sistema de categorías e income types descargado del servidor al iniciar sesión
+
+---
+
+## [PENDIENTE] Operación de producción (post-despliegue 0.3.0, 2026-10-01)
+
+Producción corre en el CT108 de PVE2 (`/docker/vsoto.cl/PrivateApp/ControlGastos`, compose con
+`--env-file .env --env-file .env.prd`). Pendientes que dejó el despliegue de la 0.3.0:
+
+### Restricción de CPU del host (VIA Nano X2, sin x86-64-v2)
+
+El host no soporta SSE4.2, y numpy >= 2.5 exige x86-64-v2: al importarse (vía `pytesseract` o
+`pandas`) crashea el backend y el `ocr-worker` al arrancar. Por eso `numpy==2.3.5` está fijado en
+`backend/requirements.txt`.
+
+- Al actualizar dependencias con binarios (numpy, pandas, Pillow, etc.), verificar el import en el
+  host **antes** de desplegar:
+  `docker run --rm --entrypoint python <imagen> -c "import numpy, pandas, pytesseract"`.
+- Si se migra la app a un host con CPU x86-64-v2 o superior, se puede quitar el pin.
+
+### Reconstruir imágenes de forma limpia
+
+Las imágenes `controlgastos-{backend,ocr-worker,reminder-worker}:latest` en producción son un
+hotfix (imagen 0.3.0 + `pip install numpy==2.3.5` en una capa extra). Funcionan igual, pero hay que
+reconstruirlas con `docker compose ... build` cuando el pin esté en `main` y se haya hecho
+`git pull` en el CT108, para que la imagen corresponda exactamente al Dockerfile.
+
+### Limpieza de respaldos e imágenes del despliegue
+
+- Imágenes `controlgastos-*:0.3.0-numpyfail`: borrar (no sirven).
+- Imágenes `controlgastos-*:pre-0.3.0` y respaldo
+  `/root/backups/controlgastos/20261001-085100-pre-0.3.0/` (dump DB, MinIO, config): conservar un
+  período de gracia y luego borrar o mover fuera del CT.
+- Evaluar respaldos periódicos de la DB y MinIO fuera del CT108 (hoy no hay ninguno automatizado).
+
+### Procedimiento de despliegue y rollback
+
+El backend ejecuta `alembic upgrade head` al arrancar, así que **una imagen anterior no arranca
+contra una DB ya migrada** (falla con `Can't locate revision`). Un rollback real exige: imágenes
+`pre-<versión>` + `git checkout` del commit previo + restaurar el `pg_dump`. Documentar el
+procedimiento de despliegue (respaldo → build → stop → migrar → verificar) en el README o en un
+script, y evaluar separar la migración del arranque del contenedor.
+
+---
+
+## [PENDIENTE] Validar ramas antes de merge o descarte (2026-10-01)
+
+Ramas locales creadas tras el despliegue 0.3.0, aún **sin push**. Validar cada commit y decidir
+merge a `main` o descarte. Las dos ramas no tienen conflictos entre sí (verificado con
+`git merge-tree`).
+
+### Rama `fix/numpy-cpu-produccion` — recomendación: merge pronto
+
+Sin este merge, el próximo `compose build` en producción vuelve a dejar caídos el backend y el
+`ocr-worker`.
+
+| Commit | Qué validar | Criterio |
+|---|---|---|
+| `0f01be9` fix(backend): pin numpy 2.3.5 | En el CT108: `docker compose ... build backend` y luego `docker run --rm --entrypoint python controlgastos-backend -c "import numpy, pandas, pytesseract"` sin error. En dev: exportación Excel/CSV y OCR siguen funcionando. | Merge si importa bien en el host de producción. Descartar solo si se cambia de host a uno con CPU x86-64-v2 o superior. |
+| `034e3f1` docs: pendientes de operación 0.3.0 | Que lo descrito (rutas, tags de imágenes, respaldos) coincida con el estado real del CT108. | Merge (solo documentación). |
+| `d6ff41c` docs: backlog de Listas de Compra y Egresos | Que los puntos reflejen lo pedido (editar título, listas visibles en Egresos, columna de acciones, selección masiva). | Merge (solo documentación). |
+| (este commit) docs: validación de ramas | Quitar esta sección una vez resueltas ambas ramas. | Merge (solo documentación). |
+
+### Rama `feature/integraciones-canales` — recomendación: no mergear hasta resolver el bloqueante
+
+| Commit | Qué validar | Criterio |
+|---|---|---|
+| `61cc7ff` feat(backend): vinculación de canales | En dev: `alembic upgrade head` aplica `315c19dda564` sobre `8f656be3110f` y `alembic downgrade -1` revierte limpio. Flujo completo: `POST /channels/link-codes` → `POST /channels/link` → `POST /ingestion/receipts` con `X-Channel`/`X-Channel-Id`. El Bearer clásico sigue funcionando. | **Bloqueante:** antes de mergear, agregar un secreto compartido con n8n (ver sección Integraciones en esta rama). Sin eso, descartar o dejar la rama en espera. |
+| `c3305fa` feat(frontend): página Integraciones | `npm run build` y `npm run lint` sin errores (no se corrieron al commitear). Generar código, ver cómo se detecta el vínculo y desvincular. | Merge junto con `61cc7ff`; no tiene sentido sin el backend. |
+| `6f2dcd3` refactor(admin): menú agrupado del admin | Navegar `/admin` expandido y colapsado, en desktop y móvil; la ruta activa se marca bien. | Independiente de canales: se puede pasar a `main` aparte (`git cherry-pick`) aunque se descarte el resto. |
+| `c5e2764` docs(frontend): guías de Ayuda | Las imágenes cargan en `/ayuda`. La guía de canales solo tiene sentido si se mergea la feature. | La parte de responsable/obviable aplica ya; si se descarta canales, separar la guía 10 y su FAQ antes de mergear. |
+| `ca6ce8d` docs: TODO de seguridad de canales | — | Merge con la rama. |
 
 ---
