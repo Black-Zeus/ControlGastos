@@ -139,3 +139,44 @@ Tablas: `expenses_local`, `incomes_local`, `shopping_lists`, `shopping_list_item
 - Mismo sistema de categorías e income types descargado del servidor al iniciar sesión
 
 ---
+
+## [PENDIENTE] Operación de producción (post-despliegue 0.3.0, 2026-10-01)
+
+Producción corre en el CT108 de PVE2 (`/docker/vsoto.cl/PrivateApp/ControlGastos`, compose con
+`--env-file .env --env-file .env.prd`). Pendientes que dejó el despliegue de la 0.3.0:
+
+### Restricción de CPU del host (VIA Nano X2, sin x86-64-v2)
+
+El host no soporta SSE4.2, y numpy >= 2.5 exige x86-64-v2: al importarse (vía `pytesseract` o
+`pandas`) crashea el backend y el `ocr-worker` al arrancar. Por eso `numpy==2.3.5` está fijado en
+`backend/requirements.txt`.
+
+- Al actualizar dependencias con binarios (numpy, pandas, Pillow, etc.), verificar el import en el
+  host **antes** de desplegar:
+  `docker run --rm --entrypoint python <imagen> -c "import numpy, pandas, pytesseract"`.
+- Si se migra la app a un host con CPU x86-64-v2 o superior, se puede quitar el pin.
+
+### Reconstruir imágenes de forma limpia
+
+Las imágenes `controlgastos-{backend,ocr-worker,reminder-worker}:latest` en producción son un
+hotfix (imagen 0.3.0 + `pip install numpy==2.3.5` en una capa extra). Funcionan igual, pero hay que
+reconstruirlas con `docker compose ... build` cuando el pin esté en `main` y se haya hecho
+`git pull` en el CT108, para que la imagen corresponda exactamente al Dockerfile.
+
+### Limpieza de respaldos e imágenes del despliegue
+
+- Imágenes `controlgastos-*:0.3.0-numpyfail`: borrar (no sirven).
+- Imágenes `controlgastos-*:pre-0.3.0` y respaldo
+  `/root/backups/controlgastos/20261001-085100-pre-0.3.0/` (dump DB, MinIO, config): conservar un
+  período de gracia y luego borrar o mover fuera del CT.
+- Evaluar respaldos periódicos de la DB y MinIO fuera del CT108 (hoy no hay ninguno automatizado).
+
+### Procedimiento de despliegue y rollback
+
+El backend ejecuta `alembic upgrade head` al arrancar, así que **una imagen anterior no arranca
+contra una DB ya migrada** (falla con `Can't locate revision`). Un rollback real exige: imágenes
+`pre-<versión>` + `git checkout` del commit previo + restaurar el `pg_dump`. Documentar el
+procedimiento de despliegue (respaldo → build → stop → migrar → verificar) en el README o en un
+script, y evaluar separar la migración del arranque del contenedor.
+
+---
