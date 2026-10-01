@@ -221,3 +221,33 @@ procedimiento de despliegue (respaldo → build → stop → migrar → verifica
 script, y evaluar separar la migración del arranque del contenedor.
 
 ---
+
+## [PENDIENTE] Validar ramas antes de merge o descarte (2026-10-01)
+
+Ramas locales creadas tras el despliegue 0.3.0, aún **sin push**. Validar cada commit y decidir
+merge a `main` o descarte. Las dos ramas no tienen conflictos entre sí (verificado con
+`git merge-tree`).
+
+### Rama `fix/numpy-cpu-produccion` — recomendación: merge pronto
+
+Sin este merge, el próximo `compose build` en producción vuelve a dejar caídos el backend y el
+`ocr-worker`.
+
+| Commit | Qué validar | Criterio |
+|---|---|---|
+| `0f01be9` fix(backend): pin numpy 2.3.5 | En el CT108: `docker compose ... build backend` y luego `docker run --rm --entrypoint python controlgastos-backend -c "import numpy, pandas, pytesseract"` sin error. En dev: exportación Excel/CSV y OCR siguen funcionando. | Merge si importa bien en el host de producción. Descartar solo si se cambia de host a uno con CPU x86-64-v2 o superior. |
+| `034e3f1` docs: pendientes de operación 0.3.0 | Que lo descrito (rutas, tags de imágenes, respaldos) coincida con el estado real del CT108. | Merge (solo documentación). |
+| `d6ff41c` docs: backlog de Listas de Compra y Egresos | Que los puntos reflejen lo pedido (editar título, listas visibles en Egresos, columna de acciones, selección masiva). | Merge (solo documentación). |
+| (este commit) docs: validación de ramas | Quitar esta sección una vez resueltas ambas ramas. | Merge (solo documentación). |
+
+### Rama `feature/integraciones-canales` — recomendación: no mergear hasta resolver el bloqueante
+
+| Commit | Qué validar | Criterio |
+|---|---|---|
+| `61cc7ff` feat(backend): vinculación de canales | En dev: `alembic upgrade head` aplica `315c19dda564` sobre `8f656be3110f` y `alembic downgrade -1` revierte limpio. Flujo completo: `POST /channels/link-codes` → `POST /channels/link` → `POST /ingestion/receipts` con `X-Channel`/`X-Channel-Id`. El Bearer clásico sigue funcionando. | **Bloqueante:** antes de mergear, agregar un secreto compartido con n8n (ver sección Integraciones en esta rama). Sin eso, descartar o dejar la rama en espera. |
+| `c3305fa` feat(frontend): página Integraciones | `npm run build` y `npm run lint` sin errores (no se corrieron al commitear). Generar código, ver cómo se detecta el vínculo y desvincular. | Merge junto con `61cc7ff`; no tiene sentido sin el backend. |
+| `6f2dcd3` refactor(admin): menú agrupado del admin | Navegar `/admin` expandido y colapsado, en desktop y móvil; la ruta activa se marca bien. | Independiente de canales: se puede pasar a `main` aparte (`git cherry-pick`) aunque se descarte el resto. |
+| `c5e2764` docs(frontend): guías de Ayuda | Las imágenes cargan en `/ayuda`. La guía de canales solo tiene sentido si se mergea la feature. | La parte de responsable/obviable aplica ya; si se descarta canales, separar la guía 10 y su FAQ antes de mergear. |
+| `ca6ce8d` docs: TODO de seguridad de canales | — | Merge con la rama. |
+
+---
