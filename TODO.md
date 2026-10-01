@@ -4,6 +4,32 @@ Registro de funcionalidades pendientes y propuestas.
 
 ---
 
+## [PENDIENTE] Egresos — mejoras de UX
+
+### Columna de acciones sobrecargada
+
+La columna de acciones de la tabla de Egresos (`frontend/src/pages/ExpensesPage.tsx`) tiene
+demasiados botones por fila y se ve mal, sobre todo en pantallas angostas. Buscar una mejora
+visual; la opción candidata (aún no decidida) es dejar visibles solo las 1–2 acciones más usadas y
+mover el resto a un menú desplegable ("⋯") basado en las primitivas Radix de `components/ui/`.
+
+### Selección múltiple y acciones masivas
+
+Permitir marcar varios egresos (checkbox por fila + "seleccionar todos" sobre lo filtrado) y
+aplicar una acción en bloque. Caso principal: **confirmar todos los borradores** de una vez
+(egresos en borrador que vienen de la ingesta/OCR). Otras candidatas: marcar como saldado o
+pendiente y eliminar.
+
+- Frontend: `DataTable` no soporta selección hoy; hay que agregarla sin romper las filas
+  expandibles (`isExpandable`/`renderExpanded`).
+- Backend: evaluar un endpoint bulk (p. ej. `POST /expenses/bulk` con `ids` + `action`) en vez de N
+  llamadas, respetando las reglas de período (solo egresos de un período abierto) y devolviendo el
+  resultado por ítem para informar cuáles fallaron.
+- Confirmar un borrador exige monto, categoría y fecha válidos: definir qué pasa con los que no los
+  tienen (omitirlos e informarlos, o bloquear la acción).
+
+---
+
 ## [EN PROGRESO] Egresos Compuestos y Listas de Compra
 
 ### Qué busca cubrir
@@ -49,6 +75,21 @@ para distinguir `"web"`/`"mobile"`/`"api"`. **Esto ya existe**: `expenses.source
 Postgres (`TransactionSource`, hoy `web`/`ingestion`). Cuando la app mobile necesite distinguir su
 origen, la forma correcta es extender ese enum (`ALTER TYPE transaction_source ADD VALUE 'mobile'`
 vía migración Alembic) — no agregar una columna paralela.
+
+### Trabajo restante — Listas de Compra
+
+1. **Editar el título de la lista**: el backend ya lo soporta (`PATCH /shopping-lists/{id}` acepta
+   `name`), falta la UI en `ShoppingListDetailPage.tsx` y/o `ShoppingListsPage.tsx` (edición inline
+   o modal).
+2. **Listas siempre visibles en Egresos, saldadas solo al enviarlas**: las listas de compra deben
+   aparecer siempre en la pestaña Egresos (como gasto en curso o pendiente), y pasar a `saldado`
+   **solo** cuando se pulsa "Enviar a egreso". Hoy la lista no aparece en Egresos hasta enviarla, y
+   el envío crea el egreso directamente como `saldado`.
+   - Definir cómo se representa en Egresos antes del envío: ¿egreso `pendiente` vinculado por
+     `shopping_list_id` y actualizado al enviar, o una fila virtual que no suma a los totales?
+     Cuidar que no se dupliquen montos en los totales del período.
+   - Revisar el texto del botón y de la descripción de "Enviar a egreso" (quizá "Marcar como
+     saldado" o "Cerrar compra") para que refleje el nuevo comportamiento.
 
 ### Trabajo restante — Desglose manual en el formulario de egresos
 
