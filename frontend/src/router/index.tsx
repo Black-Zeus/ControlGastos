@@ -13,6 +13,7 @@ import { PeriodsPage } from '@/pages/PeriodsPage'
 import { HelpPage } from '@/pages/HelpPage'
 import { ShoppingListsPage } from '@/pages/ShoppingListsPage'
 import { ShoppingListDetailPage } from '@/pages/ShoppingListDetailPage'
+import { IntegrationsPage } from '@/pages/IntegrationsPage'
 import { AdminLoginPage } from '@/pages/admin/AdminLoginPage'
 import { AdminForceChangePwdPage } from '@/pages/admin/AdminForceChangePwdPage'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
@@ -110,6 +111,7 @@ export function AppRouter() {
         </Route>
         <Route path="catalogos"  element={<CatalogsPage />} />
         <Route path="periodos"   element={<PeriodsPage />} />
+        <Route path="integraciones" element={<IntegrationsPage />} />
         <Route path="perfil"     element={<ProfilePage />} />
         <Route path="ayuda"      element={<HelpPage />} />
       </Route>

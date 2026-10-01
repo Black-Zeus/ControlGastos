@@ -142,6 +142,24 @@ export interface ExpenseCreatePayload {
   responsible_tag?: string | null
 }
 
+// ─── Integraciones (canales de ingesta) ────────────────────────────────────────
+
+export type Channel = 'telegram' | 'whatsapp'
+
+export interface ChannelLink {
+  id: string
+  channel: Channel
+  channel_id: string
+  label: string | null
+  linked_at: string
+}
+
+export interface ChannelLinkCode {
+  code: string
+  channel: Channel
+  expires_at: string
+}
+
 export interface OcrPreview {
   ocr_raw_text: string
   amount: string | null
@@ -431,5 +449,10 @@ export const userApi = {
       update: (listId: string, itemId: string, body: ShoppingListItemUpdatePayload) => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(body) }),
       delete: (listId: string, itemId: string)                                     => request<void>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE' }),
     },
+  },
+  channels: {
+    list:       ()                          => request<ChannelLink[]>('/v1/channels'),
+    unlink:     (id: string)                => request<void>(`/v1/channels/${id}`, { method: 'DELETE' }),
+    createCode: (channel: Channel)          => request<ChannelLinkCode>('/v1/channels/link-codes', { method: 'POST', body: JSON.stringify({ channel }) }),
   },
 }
