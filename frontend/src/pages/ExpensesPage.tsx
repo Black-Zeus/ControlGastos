@@ -607,7 +607,7 @@ function ExpenseForm({
   onSubmit, onCancel, submitLabel, onPreviewAttachment,
   shoppingListId, onViewShoppingList,
 }: ExpenseFormProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toLocalISODate(new Date())
   const { min: dateMin, max: dateMax } = periodDateRange(openPeriod)
   const [date, setDate]             = useState(initial?.date ?? today)
   const [label, setLabel]           = useState(initial?.label ?? '')

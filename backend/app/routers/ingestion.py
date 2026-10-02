@@ -18,6 +18,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import date as date_cls, datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, status
@@ -179,6 +180,14 @@ async def _authenticate_ingestion(
     return IngestionAuth(user_id=token.user_id, token=token)
 
 
+async def _user_today(db: AsyncSession, user_id: uuid.UUID) -> date_cls:
+    tz_name = (await db.execute(select(User.timezone).where(User.id == user_id))).scalar_one_or_none()
+    try:
+        return datetime.now(ZoneInfo(tz_name or "America/Santiago")).date()
+    except Exception:
+        return datetime.now(ZoneInfo("America/Santiago")).date()
+
+
 async def _get_ingested_expense(
     expense_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession
 ) -> Expense:
@@ -246,8 +255,8 @@ async def ingest_receipt(
     expense = Expense(
         user_id=auth.user_id,
         period_id=open_period.id,
-        # Hoy, acotado al período abierto (si este quedó atrás, se usa su último día).
-        date=clamp_to_period(date_cls.today(), open_period),
+        # Hoy en la zona del usuario (el servidor corre en UTC), acotado al período abierto.
+        date=clamp_to_period(await _user_today(db, auth.user_id), open_period),
         label=note or "Recibo pendiente de revisión",
         category_id=otros.id,
         amount=0,
