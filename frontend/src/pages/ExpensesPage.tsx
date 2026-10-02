@@ -802,72 +802,6 @@ function ExpenseForm({
             </div>
           </FormGrid>
 
-          {/* Desglose en ítems (egreso compuesto) */}
-          {canBreakdown && (
-            <div className="rounded-xl border border-gray-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setItems(prev => (prev.length ? prev : [{ label: '', amount: '' }]))}
-                aria-expanded={hasItems}
-                className={cn(
-                  'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium',
-                  hasItems ? 'text-gray-700 dark:text-slate-300' : 'text-primary-600 hover:bg-gray-50 dark:text-primary-400 dark:hover:bg-slate-800/50',
-                )}
-              >
-                <span className="flex items-center gap-2"><ListTree size={14} /> Desglosar en ítems</span>
-                {hasItems && <span className="text-xs font-normal text-gray-400 dark:text-slate-500">{items.length} {items.length === 1 ? 'ítem' : 'ítems'}</span>}
-              </button>
-
-              {hasItems && (
-                <div className="space-y-2 border-t border-gray-100 px-3 pb-3 pt-3 dark:border-slate-800">
-                  {items.map((it, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        value={it.label}
-                        onChange={e => updateItem(i, { label: e.target.value })}
-                        placeholder="Descripción"
-                        aria-label={`Descripción del ítem ${i + 1}`}
-                        maxLength={200}
-                        className={cn(inputCls, 'min-w-0 flex-1 px-3 py-2')}
-                      />
-                      <input
-                        type="text"
-                        inputMode={amountStep === '1' ? 'numeric' : 'decimal'}
-                        value={it.amount}
-                        onChange={e => { const v = sanitizeAmount(e.target.value); if (v !== null) updateItem(i, { amount: v }) }}
-                        onFocus={e => updateItem(i, { amount: parseAmountInput(e.currentTarget.value, amountStep) })}
-                        onBlur={e => updateItem(i, { amount: fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep) })}
-                        placeholder={amountStep === '1' ? '0' : '0.00'}
-                        aria-label={`Monto del ítem ${i + 1}`}
-                        className={cn(inputCls, 'w-28 shrink-0 px-3 py-2 text-right tabular-nums sm:w-32')}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}
-                        title="Quitar ítem"
-                        aria-label={`Quitar ítem ${i + 1}`}
-                        className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setItems(prev => [...prev, { label: '', amount: '' }])}
-                      className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                    >
-                      <Plus size={13} /> Agregar ítem
-                    </button>
-                    <span className="text-sm text-gray-500 dark:text-slate-400">
-                      Total <span className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(itemsTotal, currency)}</span>
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Categoría */}
           <div>
@@ -1026,6 +960,76 @@ function ExpenseForm({
             onNewPendingFile={handleOcrAttach}
             isListEvidence={itemsLocked}
           />
+
+          {/* Desglose en ítems (egreso compuesto) */}
+          {canBreakdown && (
+            <div className="mt-5 rounded-xl border border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setItems(prev => (prev.length ? prev : [{ label: '', amount: '' }]))}
+                aria-expanded={hasItems}
+                className={cn(
+                  'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium',
+                  hasItems ? 'text-gray-700 dark:text-slate-300' : 'text-primary-600 hover:bg-gray-50 dark:text-primary-400 dark:hover:bg-slate-800/50',
+                )}
+              >
+                <span className="flex items-center gap-2"><ListTree size={14} /> Desglosar en ítems</span>
+                {hasItems && <span className="text-xs font-normal text-gray-400 dark:text-slate-500">{items.length} {items.length === 1 ? 'ítem' : 'ítems'}</span>}
+              </button>
+
+              {hasItems && (
+                <div className="border-t border-gray-100 px-3 pb-3 pt-3 dark:border-slate-800">
+                  {/* Scroll interno: el desglose nunca agranda el modal */}
+                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                  {items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={it.label}
+                        onChange={e => updateItem(i, { label: e.target.value })}
+                        placeholder="Descripción"
+                        aria-label={`Descripción del ítem ${i + 1}`}
+                        maxLength={200}
+                        className={cn(inputCls, 'min-w-0 flex-1 px-2 py-2')}
+                      />
+                      <input
+                        type="text"
+                        inputMode={amountStep === '1' ? 'numeric' : 'decimal'}
+                        value={it.amount}
+                        onChange={e => { const v = sanitizeAmount(e.target.value); if (v !== null) updateItem(i, { amount: v }) }}
+                        onFocus={e => updateItem(i, { amount: parseAmountInput(e.currentTarget.value, amountStep) })}
+                        onBlur={e => updateItem(i, { amount: fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep) })}
+                        placeholder={amountStep === '1' ? '0' : '0.00'}
+                        aria-label={`Monto del ítem ${i + 1}`}
+                        className={cn(inputCls, 'w-24 shrink-0 px-2 py-2 text-right tabular-nums')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}
+                        title="Quitar ítem"
+                        aria-label={`Quitar ítem ${i + 1}`}
+                        className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setItems(prev => [...prev, { label: '', amount: '' }])}
+                      className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    >
+                      <Plus size={13} /> Agregar ítem
+                    </button>
+                    <span className="text-sm text-gray-500 dark:text-slate-400">
+                      Total <span className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(itemsTotal, currency)}</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {lockedItems.length > 0 && (
             <div className="mt-5 border-t border-gray-100 pt-4 dark:border-slate-800">
