@@ -7,8 +7,9 @@ Flujo pensado para integraciones externas (bots de wsp/telegram vía n8n):
   3. POST /ingestion/receipts/{id}/confirm → confirma/corrige monto-categoría-fecha y cierra el borrador.
 
 Autenticación de este submódulo (_authenticate_ingestion): Bearer <ingestion_token>
-(clásico) O headers X-Channel + X-Channel-Id de un canal ya vinculado
-(ver app.routers.channels) — n8n puede usar cualquiera de los dos.
+(clásico) O headers X-Channel + X-Channel-Id de un canal ya vinculado (ver
+app.routers.channels) junto con X-Integration-Key (ver app.auth.integration) —
+n8n puede usar cualquiera de los dos.
 """
 import asyncio
 import hashlib
@@ -25,6 +26,7 @@ from sqlalchemy import select
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user
+from app.auth.integration import assert_integration_key
 from app.database import get_db
 from app.models.user import User
 from app.models.ingestion import IngestionToken
@@ -137,12 +139,14 @@ async def _authenticate_ingestion(
 ) -> IngestionAuth:
     """
     Dos esquemas válidos, en este orden de preferencia:
-      1. X-Channel + X-Channel-Id — canal ya vinculado (ver app.routers.channels).
+      1. X-Channel + X-Channel-Id — canal ya vinculado (ver app.routers.channels),
+         solo con X-Integration-Key válida: el identificador de canal no es secreto.
       2. Authorization: Bearer <ingestion_token> — esquema clásico.
     """
     channel = request.headers.get("X-Channel")
     channel_id = request.headers.get("X-Channel-Id")
     if channel and channel_id:
+        assert_integration_key(request)
         link = (await db.execute(
             select(UserChannelLink).where(
                 UserChannelLink.channel == channel,

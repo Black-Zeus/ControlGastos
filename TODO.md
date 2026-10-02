@@ -76,25 +76,27 @@ El modelo de lista de compras en SQLite se diseña para convertirse en un egreso
 Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/IntegrationsPage.tsx`
 (migración `315c19dda564`). **Aún no desplegado en producción.**
 
-### [BLOQUEANTE para desplegar] Autenticar a n8n en la ingesta por canal
+### ~~Autenticar a n8n en la ingesta por canal~~ — resuelto
 
-Hoy, una vez vinculado un canal, `/ingestion/*` (ver `_authenticate_ingestion` en
-`routers/ingestion.py`) acepta como única credencial los headers `X-Channel` + `X-Channel-Id`.
-Esos valores no son secretos (un chat_id de Telegram o un número de WhatsApp), y la API es pública
-vía Cloudflare. Cualquiera que conozca el identificador de un canal vinculado podría subir y
-confirmar recibos a nombre de ese usuario.
+`POST /channels/link` y la ingesta por canal (`X-Channel` + `X-Channel-Id`) exigen el header
+`X-Integration-Key`, validado con `secrets.compare_digest` contra la variable `INTEGRATION_KEY`
+(ver `app/auth/integration.py`). Si la variable está vacía, esas rutas responden 503. El esquema
+`Bearer <ingestion_token>` no cambia.
 
-Antes de desplegar:
-- Exigir además un secreto compartido entre n8n y el backend (p. ej. un header
-  `X-Integration-Key` validado contra una variable de entorno, comparando en tiempo constante con
-  `secrets.compare_digest`), tanto en la ingesta por canal como en `POST /channels/link`.
-- Alternativa o complemento: restringir esas rutas en nginx a la IP o red interna de n8n.
+### Para desplegar
+
+- Generar la clave (`openssl rand -hex 32`) y ponerla en `.env.prd` del CT108 como
+  `INTEGRATION_KEY=...`; la misma clave va en las credenciales de n8n.
+- En los flujos de n8n, enviar `X-Integration-Key` en `POST /channels/link` y en todas las
+  llamadas a `/ingestion/*` que usen `X-Channel`/`X-Channel-Id`.
+- Opcional (defensa en profundidad): restringir esas rutas en nginx a la IP o red de n8n.
 
 ### Otros pendientes
 
-- Verificar tipos y lint del frontend (`npm run build` / `npm run lint`): no se corrieron al
-  commitear.
-- Probar end-to-end con n8n en dev: código → `POST /channels/link` → recibo con headers de canal.
+- Lint del frontend: `npm run lint` no corre porque `eslint` no está en las dependencias (los
+  tipos sí se verificaron con `tsc -b`).
+- Probar end-to-end con n8n real en dev. Contra la API ya se probó con curl: código →
+  `POST /channels/link` → recibo con headers de canal (401 sin clave o con clave errónea).
 
 ---
 

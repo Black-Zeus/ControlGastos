@@ -49,6 +49,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-receipts}
       GOTENBERG_URL: http://gotenberg:3000
       REDIS_URL: redis://redis:6379/0
+      INTEGRATION_KEY: ${INTEGRATION_KEY:-}
     networks:
       - internal
     depends_on:

@@ -7,11 +7,12 @@ cada mensaje entrante sin gestionar tokens por usuario:
   1. POST /channels/link-codes  (sesión de usuario) → genera un código de un
      solo uso, vigente 10 minutos.
   2. El usuario envía ese código por el canal que quiere vincular.
-  3. POST /channels/link        (público — el código en sí es la prueba de
-     que controla ese chat_id/número) → n8n llama esto con el código recibido
-     y el channel_id real del remitente del mensaje.
-  4. De ahí en más, /ingestion/* acepta headers X-Channel + X-Channel-Id en
-     vez de Bearer <ingestion_token> — ver _authenticate_ingestion.
+  3. POST /channels/link        (solo n8n, con X-Integration-Key — el código
+     es la prueba de que el usuario controla ese chat_id/número) → n8n llama
+     esto con el código recibido y el channel_id real del remitente.
+  4. De ahí en más, /ingestion/* acepta headers X-Channel + X-Channel-Id (más
+     X-Integration-Key) en vez de Bearer <ingestion_token> — ver
+     _authenticate_ingestion y app.auth.integration.
 """
 import secrets
 import uuid
@@ -23,6 +24,7 @@ from sqlalchemy import select
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user
+from app.auth.integration import require_integration_key
 from app.auth.rate_limit import rate_limit
 from app.database import get_db
 from app.models.user import User
@@ -77,7 +79,7 @@ async def create_link_code(
     return LinkCodeOut(code=link_code.code, channel=body.channel, expires_at=expires_at)
 
 
-# ─── Confirmar vínculo (público — el código es la prueba) ────────────────────
+# ─── Confirmar vínculo (solo integración — el código es la prueba) ──────────
 
 class LinkConfirmRequest(BaseModel):
     code: str
@@ -86,12 +88,18 @@ class LinkConfirmRequest(BaseModel):
     label: Optional[str] = None
 
 
-@router.post("/link", status_code=status.HTTP_201_CREATED, dependencies=[Depends(_link_attempt_limit)])
+@router.post(
+    "/link",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_link_attempt_limit), Depends(require_integration_key)],
+)
 async def confirm_link(body: LinkConfirmRequest, db: AsyncSession = Depends(get_db)):
     """
     Sin autenticación de sesión — el código de un solo uso es la prueba de
-    identidad. Pensado para que n8n lo llame apenas recibe el mensaje con el
-    código, usando el channel_id real del remitente (chat_id/número).
+    identidad del usuario, y X-Integration-Key la de que quien llama es n8n
+    (sin ella cualquiera podría vincular un channel_id arbitrario adivinando
+    códigos). n8n lo llama apenas recibe el mensaje con el código, usando el
+    channel_id real del remitente (chat_id/número).
     """
     link_code = (await db.execute(
         select(ChannelLinkCode).where(

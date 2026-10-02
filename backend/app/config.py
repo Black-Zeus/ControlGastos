@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Redis (rate limiting compartido entre workers)
     redis_url: str = "redis://localhost:6379/0"
 
+    # Integraciones (n8n): secreto compartido exigido en POST /channels/link y en la
+    # ingesta por canal (X-Channel/X-Channel-Id). Vacío = esas rutas quedan deshabilitadas.
+    integration_key: str = ""
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
