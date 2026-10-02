@@ -8,6 +8,9 @@ abierto con el monto = suma de los ítems comprados, y un snapshot de esos ítem
 guardado en Expense.items — pero la lista en sí NO se modifica ni se cierra, sigue
 disponible para la próxima compra. Reiniciarla (desmarcar todo) es una acción aparte.
 """
+import asyncio
+import logging
+import re
 import uuid
 from datetime import datetime
 from datetime import date as date_cls
@@ -22,10 +25,14 @@ from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.models.shopping_list import ShoppingList, ShoppingListItem
-from app.models.transaction import Expense, PaymentStatus, ReviewStatus, TransactionSource
+from app.models.transaction import Attachment, Expense, PaymentStatus, ReviewStatus, TransactionSource
 from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
 from app.routers.expenses import _build_out as _build_expense_out, ExpenseOut
+from app.services.pdf_report import generate_pdf
+from app.services.pdf_shopping_list import EvidenceRow, build_shopping_list_evidence_html
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/shopping-lists", tags=["shopping-lists"])
 
@@ -166,10 +173,15 @@ def _item_was_sent_in_current_period(item: ShoppingListItem, sent_keys: set[str]
 
 
 def _build_item_snapshot(item: ShoppingListItem) -> dict:
+    # quantity/unit_price/obviable congelados al enviar: la evidencia PDF no debe depender
+    # del estado posterior de la lista (que puede reiniciarse o editarse).
     return {
         "id": str(item.id),
         "label": item.label,
         "amount": str(item.quantity * item.unit_price),
+        "quantity": str(item.quantity),
+        "unit_price": str(item.unit_price),
+        "obviable": bool(item.obviable),
     }
 
 
@@ -524,6 +536,7 @@ async def send_to_expense(
         expense.category_id = category_id
         expense.amount = expense.amount + amount
         expense.items = [*(expense.items or []), *snapshot]
+        expense.items_from_list = True
         expense.observation = body.observation
         expense.responsible_tag = body.responsible_tag
         expense.payment_status = PaymentStatus.saldado
@@ -541,12 +554,94 @@ async def send_to_expense(
             payment_status=PaymentStatus.saldado,
             shopping_list_id=shopping_list.id,
             items=snapshot,
+            items_from_list=True,
             observation=body.observation,
             responsible_tag=body.responsible_tag,
         )
         db.add(expense)
+    sent_at = datetime.utcnow()
     for item in purchased_items:
-        item.sent_at = datetime.utcnow()
+        item.sent_at = sent_at
     await db.commit()
     await db.refresh(expense)
-    return _build_expense_out(expense, cat, 0)
+
+    # Evidencia en PDF (best-effort: si Gotenberg o MinIO fallan, el egreso ya quedó registrado).
+    att_count = await _attach_list_evidence(db, expense, shopping_list, cat, current_user, sent_at)
+    return _build_expense_out(expense, cat, att_count)
+
+
+async def _attach_list_evidence(
+    db: AsyncSession,
+    expense: Expense,
+    shopping_list: ShoppingList,
+    cat: Category,
+    user: User,
+    sent_at: datetime,
+) -> int:
+    """Genera el PDF de la lista y lo deja como adjunto único del egreso (reemplaza el
+    anterior, p. ej. el de un envío previo de la misma lista). Devuelve cuántos adjuntos
+    quedan en el egreso."""
+    from app import storage
+
+    # Solo datos del snapshot del egreso; los envíos anteriores a esta versión no guardaban
+    # cantidad/precio y se muestran con "—".
+    rows: list[EvidenceRow] = []
+    for snap in expense.items or []:
+        if not isinstance(snap, dict):
+            continue
+        rows.append(EvidenceRow(
+            label=snap.get("label", ""),
+            subtotal=Decimal(str(snap.get("amount", "0"))),
+            quantity=Decimal(snap["quantity"]) if snap.get("quantity") is not None else None,
+            unit_price=Decimal(snap["unit_price"]) if snap.get("unit_price") is not None else None,
+            obviable=bool(snap.get("obviable", False)),
+        ))
+
+    existing = (await db.execute(
+        select(Attachment).where(Attachment.expense_id == expense.id)
+    )).scalar_one_or_none()
+    loop = asyncio.get_event_loop()
+    try:
+        html = build_shopping_list_evidence_html(
+            list_name=shopping_list.name,
+            expense_label=expense.label,
+            user_name=user.name,
+            currency=user.currency,
+            user_timezone=user.timezone or 'America/Santiago',
+            list_created_at=shopping_list.created_at,
+            sent_at=sent_at,
+            expense_date=expense.date,
+            planned_date=shopping_list.planned_date,
+            category_name=cat.name,
+            responsible=expense.responsible_tag,
+            observation=expense.observation,
+            rows=rows,
+        )
+        pdf = await generate_pdf(html)
+
+        slug = re.sub(r"[^\w-]+", "-", shopping_list.name.lower()).strip("-")[:60] or "lista"
+        filename = f"lista-{slug}-{sent_at:%Y%m%d}.pdf"
+        storage_key = f"attachments/{user.id}/{expense.id}/{uuid.uuid4()}/{filename}"
+        await loop.run_in_executor(None, storage.upload_bytes, pdf, storage_key, "application/pdf")
+
+        # Un solo adjunto por egreso: el PDF reemplaza al anterior.
+        if existing:
+            try:
+                await loop.run_in_executor(None, storage.delete_object, existing.storage_key)
+            except Exception:
+                logger.warning("No se pudo borrar el adjunto previo %s", existing.storage_key)
+            await db.delete(existing)
+        db.add(Attachment(
+            expense_id=expense.id,
+            user_id=user.id,
+            storage_key=storage_key,
+            original_filename=filename,
+            mime_type="application/pdf",
+            size_bytes=len(pdf),
+        ))
+        await db.commit()
+        return 1
+    except Exception:
+        logger.exception("No se pudo generar el PDF de evidencia de la lista %s", shopping_list.id)
+        await db.rollback()
+        return 1 if existing else 0

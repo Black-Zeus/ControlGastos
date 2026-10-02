@@ -51,6 +51,7 @@ class ExpenseOut(BaseModel):
     attachment_count: int = 0
     shopping_list_id: Optional[uuid.UUID] = None
     items: Optional[list[dict]] = None
+    items_from_list: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -148,6 +149,7 @@ def _build_out(expense: Expense, cat: Optional[Category], attachment_count: int 
         "attachment_count": attachment_count,
         "shopping_list_id": expense.shopping_list_id,
         "items":            expense.items,
+        "items_from_list":  expense.items_from_list,
     }
 
 
@@ -297,12 +299,16 @@ async def update_expense(
         if not cat:
             raise HTTPException(status_code=400, detail="Categoría no válida")
 
+    # Con desglose, el total es siempre la suma de los ítems: no se cambia a mano.
+    if body.items is None and expense.items and body.amount is not None and body.amount != expense.amount:
+        raise HTTPException(status_code=400, detail="El monto de un egreso con desglose se calcula desde sus ítems")
+
     for field, value in body.model_dump(exclude_none=True, exclude={"items"}).items():
         setattr(expense, field, value)
 
     if body.items is not None:
         # El desglose de un egreso enviado desde una lista de compra es su snapshot: no se edita a mano.
-        if expense.shopping_list_id:
+        if expense.items_from_list:
             raise HTTPException(status_code=400, detail="El desglose de un egreso de lista de compra no se edita manualmente")
         if body.items:
             expense.items, expense.amount = _items_snapshot(body.items)

@@ -121,6 +121,8 @@ export interface Expense {
   attachment_count: number
   shopping_list_id: string | null
   items: ExpenseItem[] | null
+  /** El desglose viene de una lista de compra: ítems y monto no se editan a mano. */
+  items_from_list: boolean
 }
 
 /** Ítem del desglose de un egreso compuesto (lista de compra o desglose manual). */

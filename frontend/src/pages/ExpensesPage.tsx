@@ -182,9 +182,15 @@ interface AttachmentPanelProps {
   // Solo dispara en el flujo de creación (sin expenseId todavía) — intenta
   // leer monto/categoría de la imagen para proponerlos en el formulario.
   onNewPendingFile?: (file: File) => void
+  /** El adjunto actual es el PDF de evidencia de una lista de compra: se pide confirmación antes de perderlo. */
+  isListEvidence?: boolean
 }
 
-function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded, onNewPendingFile }: AttachmentPanelProps) {
+const LIST_EVIDENCE_WARNING =
+  'Este adjunto es el PDF de evidencia de la lista de compra. Cada egreso admite un solo adjunto, ' +
+  'así que se perderá. ¿Continuar?'
+
+function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded, onNewPendingFile, isListEvidence }: AttachmentPanelProps) {
   const [uploaded, setUploaded] = useState<AttachmentOut | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -233,7 +239,16 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
     }
   }
 
+  // El PDF de evidencia solo se protege mientras es el adjunto original (generado al enviar la lista).
+  const guardsEvidence = !!isListEvidence && uploaded?.mime_type === 'application/pdf' && uploaded.original_filename.startsWith('lista-')
+
+  function replaceFile() {
+    if (guardsEvidence && !window.confirm(LIST_EVIDENCE_WARNING)) return
+    inputRef.current?.click()
+  }
+
   async function removeFile() {
+    if (guardsEvidence && !window.confirm(LIST_EVIDENCE_WARNING)) return
     if (expenseId && uploaded) {
       try {
         await userApi.attachments.delete(expenseId, uploaded.id)
@@ -289,7 +304,7 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
             </div>
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={replaceFile}
               className="shrink-0 rounded-lg border border-gray-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >
               Reemplazar
@@ -561,7 +576,7 @@ function ShoppingListPreviewModal({ listId, currency, onClose }: {
 // ─── Formulario de egreso ─────────────────────────────────────────────────────
 
 interface ExpenseFormProps {
-  initial?: Partial<ExpenseCreatePayload & { review_status: string }>
+  initial?: Partial<ExpenseCreatePayload & { review_status: string; items_from_list: boolean }>
   expenseId?: string
   categories: UserCategory[]
   openPeriod: Period | null
@@ -603,7 +618,9 @@ function ExpenseForm({
   const [responsible, setResponsible] = useState(initial?.responsible_tag ?? defaultResponsible)
   const [pending, setPending]       = useState<PendingFile | null>(null)
   // Desglose manual (no aplica a egresos de lista de compra: su desglose es el snapshot de la lista)
-  const canBreakdown = !shoppingListId
+  // Ítems de lista de compra: congelados (ni desglose manual ni cambio de monto), aunque la lista ya no exista.
+  const itemsLocked = !!initial?.items_from_list
+  const canBreakdown = !shoppingListId && !itemsLocked
   const [items, setItems] = useState<ExpenseItem[]>(
     () => (initial?.items ?? []).map(i => ({ label: i.label, amount: fmtAmountInput(i.amount, amountStep) })),
   )
@@ -685,6 +702,8 @@ function ExpenseForm({
   }
 
   const hasItems = canBreakdown && items.length > 0
+  // Con desglose (manual o de lista) el total siempre es la suma de los ítems.
+  const amountLocked = hasItems || (itemsLocked && (initial?.items?.length ?? 0) > 0)
   const itemsTotal = items.reduce((sum, i) => sum + (Number(parseAmountInput(i.amount, amountStep)) || 0), 0)
   const itemsTotalStr = amountStep === '1' ? String(Math.round(itemsTotal)) : itemsTotal.toFixed(2)
 
@@ -770,13 +789,13 @@ function ExpenseForm({
                 inputMode={amountStep === '1' ? 'numeric' : 'decimal'}
                 value={hasItems ? fmtAmountInput(itemsTotalStr, amountStep) : amount}
                 onChange={handleAmountChange}
-                onFocus={e => { if (!hasItems) setAmount(parseAmountInput(e.currentTarget.value, amountStep)) }}
-                onBlur={e => { if (!hasItems) setAmount(fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep)) }}
-                readOnly={hasItems}
-                title={hasItems ? 'Calculado como la suma de los ítems del desglose' : undefined}
+                onFocus={e => { if (!amountLocked) setAmount(parseAmountInput(e.currentTarget.value, amountStep)) }}
+                onBlur={e => { if (!amountLocked) setAmount(fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep)) }}
+                readOnly={amountLocked}
+                title={itemsLocked ? 'Calculado desde la lista de compra' : hasItems ? 'Calculado como la suma de los ítems del desglose' : undefined}
                 required
                 placeholder={amountStep === '1' ? '0' : '0.00'}
-                className={cn(inputCls, hasItems && 'cursor-not-allowed bg-gray-50 dark:bg-slate-900')}
+                className={cn(inputCls, amountLocked && 'cursor-not-allowed bg-gray-50 dark:bg-slate-900')}
               />
             </div>
           </FormGrid>
@@ -1003,6 +1022,7 @@ function ExpenseForm({
             onPendingChange={setPending}
             onPreviewUploaded={onPreviewAttachment ?? (() => {})}
             onNewPendingFile={handleOcrAttach}
+            isListEvidence={itemsLocked}
           />
         </div>
       </div>
@@ -1115,6 +1135,7 @@ function buildListDrafts(lists: ShoppingList[], categories: UserCategory[], peri
         created_at: l.updated_at,
         attachment_count: 0,
         shopping_list_id: l.id,
+        items_from_list: true,
         items: l.items
           .filter(i => pendingIds.has(i.id))
           .map(i => ({ label: i.label, amount: String(Number(i.quantity) * Number(i.unit_price ?? 0)) })),

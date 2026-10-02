@@ -109,6 +109,9 @@ class Expense(Base):
     responsible_tag: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Desglose de ítems (snapshot congelado — ver ShoppingList para la plantilla viva y editable).
     items: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # True si el desglose viene de una lista de compra: ítems y monto quedan bloqueados aunque
+    # la lista se elimine después (shopping_list_id pasa a null, esta marca se conserva).
+    items_from_list: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     shopping_list_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("shopping_lists.id", ondelete="SET NULL"), nullable=True
     )
