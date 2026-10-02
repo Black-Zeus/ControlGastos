@@ -1184,7 +1184,10 @@ export function ExpensesPage() {
     {
       icon:     Check,
       label:    'Confirmar borrador',
-      disabled: e => e.review_status !== 'borrador' || !!periodClosed,
+      // Botón visible solo en filas en borrador; en el resto no aplica.
+      primary:  true,
+      hidden:   e => e.review_status !== 'borrador',
+      disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'confirm-draft', expense }),
     },
     {
