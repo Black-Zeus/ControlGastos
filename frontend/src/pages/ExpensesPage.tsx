@@ -1182,9 +1182,85 @@ function buildListDrafts(lists: ShoppingList[], categories: UserCategory[], peri
         items_from_list: true,
         items: l.items
           .filter(i => pendingIds.has(i.id))
-          .map(i => ({ label: i.label, amount: String(Number(i.quantity) * Number(i.unit_price ?? 0)) })),
+          .map(i => ({
+            label: i.label,
+            amount: String(Number(i.quantity) * Number(i.unit_price ?? 0)),
+            quantity: String(i.quantity),
+            unit_price: i.unit_price != null ? String(i.unit_price) : undefined,
+            obviable: i.obviable,
+          })),
       } satisfies Expense
     })
+}
+
+// ─── Desglose en la fila expandida de la tabla ────────────────────────────────
+
+function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: string }) {
+  const items = expense.items ?? []
+  const hasQty = items.some(i => i.quantity && i.unit_price)
+  const total = items.reduce((sum, i) => sum + Number(i.amount), 0)
+  const obviableTotal = items.filter(i => i.obviable).reduce((sum, i) => sum + Number(i.amount), 0)
+  const origin = isListDraft(expense)
+    ? { label: 'Lista en curso', cls: 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400' }
+    : expense.items_from_list
+      ? { label: 'Lista de compra', cls: 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' }
+      : { label: 'Desglose manual', cls: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' }
+
+  return (
+    <div className="ml-6 max-w-2xl overflow-hidden rounded-xl border border-gray-100 bg-white shadow-soft dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-slate-800">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+          <ListTree size={13} /> Desglose · {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
+        </p>
+        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', origin.cls)}>{origin.label}</span>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            <th className="px-4 py-1.5 text-left font-medium">Producto</th>
+            {hasQty && <th className="px-3 py-1.5 text-right font-medium">Cant.</th>}
+            {hasQty && <th className="px-3 py-1.5 text-right font-medium">P. unitario</th>}
+            <th className="px-4 py-1.5 text-right font-medium">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it, i) => (
+            <tr key={i} className="border-t border-gray-50 even:bg-gray-50/60 dark:border-slate-800 dark:even:bg-slate-800/30">
+              <td className="px-4 py-1.5 text-gray-700 dark:text-slate-300">
+                {it.label}
+                {it.obviable && (
+                  <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">obviable</span>
+                )}
+              </td>
+              {hasQty && (
+                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                  {it.quantity ? Number(it.quantity).toLocaleString('es-CL') : '—'}
+                </td>
+              )}
+              {hasQty && (
+                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                  {it.unit_price ? fmtMoney(Number(it.unit_price), currency) : '—'}
+                </td>
+              )}
+              <td className="whitespace-nowrap px-4 py-1.5 text-right font-medium tabular-nums text-gray-900 dark:text-slate-100">
+                {fmtMoney(Number(it.amount), currency)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-gray-200 dark:border-slate-700">
+            <td colSpan={hasQty ? 3 : 1} className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400">
+              {obviableTotal > 0 && <>Incluye obviables: <span className="tabular-nums">{fmtMoney(obviableTotal, currency)}</span></>}
+            </td>
+            <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+              {fmtMoney(total, currency)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
 }
 
 export function ExpensesPage() {
@@ -1733,16 +1809,7 @@ export function ExpensesPage() {
         pageSizeOptions={[15, 30, 50]}
         defaultSort={{ key: 'date', dir: 'asc' }}
         isExpandable={e => !!e.items && e.items.length > 0}
-        renderExpanded={e => (
-          <div className="max-w-xs space-y-1 pl-8">
-            {e.items!.map((item, i) => (
-              <div key={i} className="flex items-center gap-4 text-sm">
-                <span className="flex-1 text-gray-600 dark:text-slate-400">{item.label}</span>
-                <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-slate-300">{fmtMoney(Number(item.amount), currency)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        renderExpanded={e => <ExpenseBreakdown expense={e} currency={currency} />}
       />
 
       {/* Modal: crear egreso */}
