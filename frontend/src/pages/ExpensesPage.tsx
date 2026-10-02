@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
@@ -15,7 +16,7 @@ import {
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter'
-import { EMPTY_RANGE, isInRange, isRangeActive, type DateRange } from '@/lib/dateRange'
+import { EMPTY_RANGE, isInRange, isRangeActive, toLocalISODate, type DateRange } from '@/lib/dateRange'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
@@ -1077,7 +1078,52 @@ type ModalState =
 
 type Filters = Record<string, string | string[]>
 
+// ─── Borradores de listas de compra ───────────────────────────────────────────
+// Una lista activa con productos comprados sin enviar se muestra en Egresos como
+// fila de solo lectura: no existe en la base (se calcula aquí), no suma en los KPIs
+// (es borrador) y desaparece sola al enviarla, porque esos ítems dejan de estar
+// pendientes. Su fecha es la "fecha de compra" de la lista, o hoy si no tiene.
+
+const LIST_DRAFT_PREFIX = 'lista-'
+
+function isListDraft(e: Expense): boolean {
+  return e.id.startsWith(LIST_DRAFT_PREFIX)
+}
+
+function buildListDrafts(lists: ShoppingList[], categories: UserCategory[], periodId: string | null): Expense[] {
+  const today = toLocalISODate(new Date())
+  return lists
+    .filter(l => !l.archived && Number(l.pending_send_amount) > 0)
+    .map(l => {
+      const cat = categories.find(c => c.id === l.default_category_id)
+      const pendingIds = new Set(l.pending_send_item_ids)
+      return {
+        id: `${LIST_DRAFT_PREFIX}${l.id}`,
+        period_id: periodId,
+        date: l.planned_date ?? today,
+        label: `Lista compra [Borrador] - ${l.name}`,
+        amount: l.pending_send_amount,
+        category_id: l.default_category_id ?? '',
+        category_name: cat?.name ?? 'Sin categoría',
+        category_type: cat?.type ?? '',
+        obviable: false,
+        payment_status: 'pendiente',
+        review_status: 'borrador',
+        source: 'web',
+        observation: null,
+        responsible_tag: null,
+        created_at: l.updated_at,
+        attachment_count: 0,
+        shopping_list_id: l.id,
+        items: l.items
+          .filter(i => pendingIds.has(i.id))
+          .map(i => ({ label: i.label, amount: String(Number(i.quantity) * Number(i.unit_price ?? 0)) })),
+      } satisfies Expense
+    })
+}
+
 export function ExpensesPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const currency  = user?.currency ?? 'CRC'
   const userName  = user?.name ?? ''
@@ -1088,6 +1134,7 @@ export function ExpensesPage() {
 
   const [expenses, setExpenses]     = useState<Expense[]>([])
   const [incomes, setIncomes]       = useState<Income[]>([])
+  const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([])
   const [range, setRange]           = useState<DateRange>(EMPTY_RANGE)
   const [categories, setCategories] = useState<UserCategory[]>([])
   const [allPeriods, setAllPeriods] = useState<Period[]>([])
@@ -1111,14 +1158,16 @@ export function ExpensesPage() {
     if (!ready || year === null || month === null) return
     setLoading(true)
     try {
-      const [exps, incs, cats, periods] = await Promise.all([
+      const [exps, incs, lists, cats, periods] = await Promise.all([
         userApi.expenses.list(year, month),
         userApi.incomes.list(year, month),
+        userApi.shoppingLists.list(false),
         userApi.categories.list(),
         userApi.periods.list(),
       ])
       setExpenses(exps)
       setIncomes(incs)
+      setShoppingLists(lists)
       setCategories(cats)
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
@@ -1170,7 +1219,13 @@ export function ExpensesPage() {
     },
   ]
 
-  const filtered = useMemo(() => expenses.filter(e => {
+  const listDrafts = useMemo(() => {
+    if (year === null || month === null) return []
+    const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`
+    return buildListDrafts(shoppingLists, categories, period?.id ?? null).filter(d => d.date.startsWith(monthPrefix))
+  }, [shoppingLists, categories, period, year, month])
+
+  const filtered = useMemo(() => [...expenses, ...listDrafts].filter(e => {
     const s = (filters.search as string).toLowerCase()
     if (s && !e.label.toLowerCase().includes(s)) return false
     if (filters.category    && e.category_id !== filters.category) return false
@@ -1181,13 +1236,14 @@ export function ExpensesPage() {
     if (filters.payment  && e.payment_status !== filters.payment)  return false
     if (!isInRange(e.date, range)) return false
     return true
-  }), [expenses, filters, range])
+  }), [expenses, listDrafts, filters, range])
 
   // La tabla sigue mostrando los borradores (con su badge) para que el usuario
   // los revise, pero un borrador sin confirmar no cuenta en estos resúmenes —
   // mismo criterio que dashboard/reportes/cierre de período.
   const confirmed       = useMemo(() => filtered.filter(e => e.review_status !== 'borrador'), [filtered])
-  const draftCount      = filtered.length - confirmed.length
+  const draftCount      = filtered.filter(e => e.review_status === 'borrador' && !isListDraft(e)).length
+  const listasEnCurso   = filtered.filter(isListDraft).reduce((s, e) => s + Number(e.amount), 0)
 
   const total          = confirmed.reduce((s, e) => s + Number(e.amount), 0)
   const pendingCount   = confirmed.filter(e => e.payment_status === 'pendiente').length
@@ -1204,7 +1260,7 @@ export function ExpensesPage() {
   const pagadoPeriodo   = expenses
     .filter(e => e.review_status !== 'borrador' && e.payment_status === 'saldado')
     .reduce((s, e) => s + Number(e.amount), 0)
-  const disponible      = ingresosPeriodo - pagadoPeriodo - montoPendiente
+  const disponible      = ingresosPeriodo - pagadoPeriodo - montoPendiente - listasEnCurso
   const periodBounds    = month !== null && year !== null
     ? { min: `${year}-${String(month).padStart(2, '0')}-01`, max: `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}` }
     : { min: undefined, max: undefined }
@@ -1236,8 +1292,16 @@ export function ExpensesPage() {
       key: 'label', label: 'Descripción', sortable: true,
       render: e => (
         <div className="flex items-center gap-2">
-          <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
-          {e.review_status === 'borrador' && <DraftBadge />}
+          {isListDraft(e) ? (
+            <p className="flex items-center gap-1.5 font-medium italic text-gray-500 dark:text-slate-400">
+              <ShoppingCart size={13} className="shrink-0" /> {e.label}
+            </p>
+          ) : (
+            <>
+              <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
+              {e.review_status === 'borrador' && <DraftBadge />}
+            </>
+          )}
         </div>
       ),
     },
@@ -1299,7 +1363,7 @@ export function ExpensesPage() {
     } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
-  const actions: RowAction<Expense>[] = [
+  const expenseActions: RowAction<Expense>[] = [
     {
       icon:     Check,
       label:    'Confirmar borrador',
@@ -1347,6 +1411,16 @@ export function ExpensesPage() {
       onClick:  expense => setModal({ type: 'delete', expense }),
     },
   ]
+  // Un borrador de lista no se edita desde Egresos: su única acción lleva a la lista de compra.
+  const actions: RowAction<Expense>[] = [
+    {
+      icon: Pencil, label: 'Editar lista', primary: true,
+      hidden: e => !isListDraft(e),
+      onClick: e => navigate(`/listas-compra/${e.shopping_list_id}`),
+    },
+    ...expenseActions.map(a => ({ ...a, hidden: (e: Expense) => isListDraft(e) || !!a.hidden?.(e) })),
+  ]
+
 
   if (!ready || year === null || month === null) {
     return (
@@ -1426,8 +1500,16 @@ export function ExpensesPage() {
             )}>
               {fmtMoney(disponible, currency)}
             </p>
+            {listasEnCurso > 0 && (
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+                Sin contar listas en curso: <span className="tabular-nums">{fmtMoney(disponible + listasEnCurso, currency)}</span>
+              </p>
+            )}
           </div>
-          <dl className="grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-3 lg:min-w-[480px] lg:gap-6">
+          <dl className={cn(
+            'grid grid-cols-1 gap-2 text-sm lg:gap-6',
+            listasEnCurso > 0 ? 'min-[420px]:grid-cols-2 lg:min-w-[600px] lg:grid-cols-4' : 'min-[420px]:grid-cols-3 lg:min-w-[480px]',
+          )}>
             <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
               <dt className="text-xs text-gray-400 dark:text-slate-500">Ingresos del período</dt>
               <dd className="font-medium tabular-nums text-gray-800 dark:text-slate-200">{fmtMoney(ingresosPeriodo, currency)}</dd>
@@ -1440,6 +1522,12 @@ export function ExpensesPage() {
               <dt className="text-xs text-gray-400 dark:text-slate-500">− Pendiente {isRangeActive(range) ? 'en el rango' : 'del período'}</dt>
               <dd className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{fmtMoney(montoPendiente, currency)}</dd>
             </div>
+            {listasEnCurso > 0 && (
+              <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+                <dt className="text-xs text-gray-400 dark:text-slate-500">− Listas en curso</dt>
+                <dd className="font-medium tabular-nums text-gray-500 dark:text-slate-400">{fmtMoney(listasEnCurso, currency)}</dd>
+              </div>
+            )}
           </dl>
         </div>
       </div>

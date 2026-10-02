@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, CheckCircle2, RotateCcw, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { userApi, type ShoppingList, type UserCategory } from '@/lib/userApi'
 import { fmtMoney } from '@/components/ui/KpiCard'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { Modal } from '@/components/ui/Modal'
+import { toLocalISODate } from '@/lib/dateRange'
+
+/** Qué se hizo con la lista después de enviarla (para que la página que abrió el modal reaccione). */
+export type SendOutcome = 'reset' | 'deleted'
 
 const btnBase = 'flex-1 rounded-xl py-2.5 text-sm font-medium transition-colors'
 const inputCls = cn(
@@ -90,10 +94,10 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
   currency: string
   defaultResponsible?: string
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (outcome: SendOutcome) => void
 }) {
-  const today = new Date().toISOString().slice(0, 10)
-  const [date, setDate] = useState(today)
+  const [date, setDate] = useState(list.planned_date ?? toLocalISODate(new Date()))
+  const [sent, setSent] = useState(false)
   const [categoryId, setCategoryId] = useState(list.default_category_id ?? '')
   const [observation, setObservation] = useState('')
   const [responsible, setResponsible] = useState(defaultResponsible)
@@ -111,7 +115,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
     : list.items.filter(i => i.purchased)
   const alreadySentCount = Math.max(0, list.purchased_count - list.pending_send_count)
   const willUpdateExpense = alreadySentCount > 0
-  const total = purchased.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price ?? 0), 0)
+  const total = Number(list.pending_send_amount)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null); setSaving(true)
@@ -123,9 +127,50 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
         observation: observation || null,
         responsible_tag: responsible || null,
       })
-      onSuccess()
+      setSent(true)
     } catch (e) { setError(e instanceof Error ? e.message : 'Error') }
     finally { setSaving(false) }
+  }
+
+  async function finish(outcome: SendOutcome) {
+    setError(null); setSaving(true)
+    try {
+      if (outcome === 'reset')   await userApi.shoppingLists.reset(list.id)
+      if (outcome === 'deleted') await userApi.shoppingLists.delete(list.id)
+      onSuccess(outcome)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Error'); setSaving(false) }
+  }
+
+  // Paso 2: el egreso ya existe; se decide qué hacer con la lista.
+  if (sent) {
+    const optionCls = 'flex w-full items-start gap-3 rounded-xl border border-gray-200 px-4 py-3 text-left transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800'
+    return (
+      // Sin X: una lista enviada no queda "a medias"; hay que elegir plantilla o eliminar.
+      <Modal size="sm" title="Egreso registrado" onClose={() => {}} closable={false}>
+        <div className="space-y-4">
+          <p className="flex items-start gap-2 rounded-xl bg-green-50 px-4 py-2.5 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+            <span>Se registró el egreso de <span className="font-semibold">{fmtMoney(total, currency)}</span> y el borrador de la lista ya no aparece en Egresos.</span>
+          </p>
+          <p className="text-sm font-medium text-gray-700 dark:text-slate-300">¿Qué hacemos con la lista “{list.name}”?</p>
+          <button type="button" disabled={saving} onClick={() => finish('reset')} className={optionCls}>
+            <RotateCcw size={16} className="mt-0.5 shrink-0 text-primary-500" />
+            <span>
+              <span className="block text-sm font-medium text-gray-900 dark:text-slate-100">Dejarla como plantilla</span>
+              <span className="block text-xs text-gray-500 dark:text-slate-400">Se desmarcan los productos y se borran sus precios, lista para la próxima compra.</span>
+            </span>
+          </button>
+          <button type="button" disabled={saving} onClick={() => finish('deleted')} className={optionCls}>
+            <Trash2 size={16} className="mt-0.5 shrink-0 text-red-500" />
+            <span>
+              <span className="block text-sm font-medium text-gray-900 dark:text-slate-100">Eliminar la lista</span>
+              <span className="block text-xs text-gray-500 dark:text-slate-400">El egreso registrado se conserva con su detalle.</span>
+            </span>
+          </button>
+          {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        </div>
+      </Modal>
+    )
   }
 
   return (

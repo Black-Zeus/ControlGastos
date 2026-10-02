@@ -269,6 +269,8 @@ export interface ShoppingList {
   name: string
   default_category_id: string | null
   archived: boolean
+  /** Fecha en que se imputa la compra (borrador en Egresos y fecha sugerida al enviar). */
+  planned_date: string | null
   created_at: string
   updated_at: string
   last_sent_at: string | null
@@ -276,17 +278,23 @@ export interface ShoppingList {
   item_count: number
   purchased_count: number
   pending_send_count: number
+  /** Monto comprado aún no enviado a egreso (el borrador que se ve en Egresos). */
+  pending_send_amount: string
+  pending_send_item_ids: string[]
 }
 
 export interface ShoppingListCreatePayload {
   name: string
   default_category_id?: string | null
+  planned_date?: string | null
 }
 
 export interface ShoppingListUpdatePayload {
   name?: string
   default_category_id?: string | null
   archived?: boolean
+  /** null quita la fecha. */
+  planned_date?: string | null
 }
 
 export interface ShoppingListItemCreatePayload {

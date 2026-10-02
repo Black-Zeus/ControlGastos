@@ -51,6 +51,7 @@ class ShoppingListOut(BaseModel):
     name: str
     default_category_id: Optional[uuid.UUID]
     archived: bool
+    planned_date: Optional[date_cls] = None
     created_at: datetime
     updated_at: datetime
     last_sent_at: Optional[datetime] = None
@@ -58,6 +59,10 @@ class ShoppingListOut(BaseModel):
     item_count: int = 0
     purchased_count: int = 0
     pending_send_count: int = 0
+    # Monto e ítems comprados aún no enviados a egreso en el período abierto: es el
+    # "borrador" que la lista muestra en Egresos.
+    pending_send_amount: Decimal = Decimal("0")
+    pending_send_item_ids: list[uuid.UUID] = []
 
     model_config = {"from_attributes": True}
 
@@ -65,12 +70,15 @@ class ShoppingListOut(BaseModel):
 class ShoppingListCreate(BaseModel):
     name: str
     default_category_id: Optional[uuid.UUID] = None
+    planned_date: Optional[date_cls] = None
 
 
 class ShoppingListUpdate(BaseModel):
     name: Optional[str] = None
     default_category_id: Optional[uuid.UUID] = None
     archived: Optional[bool] = None
+    # Admite null explícito para quitar la fecha (ver update_shopping_list).
+    planned_date: Optional[date_cls] = None
 
 
 class ShoppingListItemCreate(BaseModel):
@@ -172,18 +180,22 @@ def _build_list_out(
 ) -> dict:
     current_period_sent_item_ids = current_period_sent_item_ids or set()
     sent_dates = [i.sent_at for i in items if i.sent_at is not None]
+    pending = [i for i in items if i.purchased and not _item_was_sent_in_current_period(i, current_period_sent_item_ids)]
     return {
         "id":                  shopping_list.id,
         "name":                shopping_list.name,
         "default_category_id": shopping_list.default_category_id,
         "archived":            shopping_list.archived,
+        "planned_date":        shopping_list.planned_date,
         "created_at":          shopping_list.created_at,
         "updated_at":          shopping_list.updated_at,
         "last_sent_at":        max(sent_dates) if sent_dates else None,
         "items":               items,
         "item_count":          len(items),
         "purchased_count":     sum(1 for i in items if i.purchased),
-        "pending_send_count":  sum(1 for i in items if i.purchased and not _item_was_sent_in_current_period(i, current_period_sent_item_ids)),
+        "pending_send_count":  len(pending),
+        "pending_send_amount": sum((i.quantity * (i.unit_price or 0) for i in pending), Decimal("0")),
+        "pending_send_item_ids": [i.id for i in pending],
     }
 
 
@@ -304,12 +316,15 @@ async def update_shopping_list(
         body.name = body.name.strip()
         if not body.name:
             raise HTTPException(status_code=400, detail="El nombre de la lista no puede estar vacío")
-    for field, value in body.model_dump(exclude_none=True).items():
+    for field, value in body.model_dump(exclude_none=True, exclude={"planned_date"}).items():
         setattr(shopping_list, field, value)
+    if "planned_date" in body.model_fields_set:
+        shopping_list.planned_date = body.planned_date
     await db.commit()
     await db.refresh(shopping_list)
     items = await _load_items(db, list_id)
-    return _build_list_out(shopping_list, items)
+    sent_by_list = await _sent_item_ids_for_open_period(db, current_user.id, [list_id])
+    return _build_list_out(shopping_list, items, sent_by_list.get(list_id, set()))
 
 
 @router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)

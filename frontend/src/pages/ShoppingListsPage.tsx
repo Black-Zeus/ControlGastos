@@ -75,7 +75,10 @@ function ProcessingStatusBadge({ list }: { list: ShoppingList }) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: 'short', year: 'numeric' })
+  // 'YYYY-MM-DD' sin hora se arma en hora local: new Date('2026-12-24') sería UTC y mostraría el 23.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const d = dateOnly ? new Date(+dateOnly[1], +dateOnly[2] - 1, +dateOnly[3]) : new Date(iso)
+  return d.toLocaleDateString('es-CR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 // ─── Formulario de creación ───────────────────────────────────────────────────
@@ -87,12 +90,13 @@ function CreateForm({ categories, onSubmit, onCancel }: {
 }) {
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [plannedDate, setPlannedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null); setSaving(true)
-    try { await onSubmit({ name, default_category_id: categoryId || null }) }
+    try { await onSubmit({ name, default_category_id: categoryId || null, planned_date: plannedDate || null }) }
     catch (e) { setError(e instanceof Error ? e.message : 'Error') }
     finally { setSaving(false) }
   }
@@ -110,6 +114,15 @@ function CreateForm({ categories, onSubmit, onCancel }: {
         </select>
         <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
           Se usará al enviar la lista a egreso, si no indicas otra en ese momento.
+        </p>
+      </div>
+      <div>
+        <label htmlFor="sl-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+          Fecha de compra <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
+        </label>
+        <input id="sl-date" type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} className={selectCls} />
+        <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
+          Fecha en que se imputa la compra en Egresos (p. ej. el 24/12 para Navidad). Si la dejas vacía, se usa la de hoy.
         </p>
       </div>
       {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -207,6 +220,14 @@ export function ShoppingListsPage() {
       render: l => (
         <span className="text-sm text-gray-600 dark:text-slate-400">
           {l.purchased_count} / {l.item_count} comprados
+        </span>
+      ),
+    },
+    {
+      key: 'planned_date', label: 'Fecha compra', sortable: true,
+      render: l => (
+        <span className="whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
+          {l.planned_date ? fmtDate(l.planned_date) : '—'}
         </span>
       ),
     },

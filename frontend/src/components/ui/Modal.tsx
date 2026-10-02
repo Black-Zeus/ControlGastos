@@ -23,9 +23,11 @@ interface ModalProps {
   onClose: () => void
   children: React.ReactNode
   size?: ModalSize
+  /** false oculta la X: para pasos que exigen elegir una de las acciones del cuerpo. */
+  closable?: boolean
 }
 
-export function Modal({ title, onClose, children, size = 'md' }: ModalProps) {
+export function Modal({ title, onClose, children, size = 'md', closable = true }: ModalProps) {
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -46,13 +48,15 @@ export function Modal({ title, onClose, children, size = 'md' }: ModalProps) {
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-slate-800 sm:px-6 sm:py-4">
           <h2 className="min-w-0 text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800"
-          >
-            <X size={18} />
-          </button>
+          {closable && (
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
       </div>

@@ -115,15 +115,15 @@ vía migración Alembic) — no agregar una columna paralela.
 
 1. ~~**Editar el título de la lista**~~ — hecho (lápiz junto al título en el detalle). El listado
    muestra además el monto ya comprado de cada lista.
-2. **Listas siempre visibles en Egresos, saldadas solo al enviarlas**: las listas de compra deben
-   aparecer siempre en la pestaña Egresos (como gasto en curso o pendiente), y pasar a `saldado`
-   **solo** cuando se pulsa "Enviar a egreso". Hoy la lista no aparece en Egresos hasta enviarla, y
-   el envío crea el egreso directamente como `saldado`.
-   - Definir cómo se representa en Egresos antes del envío: ¿egreso `pendiente` vinculado por
-     `shopping_list_id` y actualizado al enviar, o una fila virtual que no suma a los totales?
-     Cuidar que no se dupliquen montos en los totales del período.
-   - Revisar el texto del botón y de la descripción de "Enviar a egreso" (quizá "Marcar como
-     saldado" o "Cerrar compra") para que refleje el nuevo comportamiento.
+2. ~~**Listas siempre visibles en Egresos**~~ — hecho. Cada lista activa con productos comprados
+   sin enviar aparece en Egresos como fila de solo lectura "Lista compra [Borrador] - nombre"
+   (calculada en el frontend con `pending_send_amount`; no se guarda ni suma en los KPIs, pero
+   sí se resta aparte en "Disponible"). Su fecha es `shopping_lists.planned_date` ("Fecha de
+   compra", p. ej. 24/12 para Navidad) o hoy; solo se ve en el mes de esa fecha. "Editar" lleva a
+   la lista. Al enviar se crea el egreso real y el modal obliga a elegir: dejar la lista como
+   plantilla (reiniciar) o eliminarla.
+   - Pendiente evaluar: el egreso enviado se registra en el período abierto aunque la fecha de
+     compra caiga en otro mes (mismo comportamiento que antes de esta función).
 
 ### ~~Desglose manual en el formulario de egresos~~ — hecho
 

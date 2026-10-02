@@ -111,26 +111,28 @@ interface ItemFormData {
   obviable: boolean
 }
 
-// ─── Renombrar lista ──────────────────────────────────────────────────────────
+// ─── Editar lista (nombre + fecha de compra) ──────────────────────────────────
 
-function RenameListModal({ initialName, onClose, onSubmit }: {
+function EditListModal({ initialName, initialDate, onClose, onSubmit }: {
   initialName: string
+  initialDate: string | null
   onClose: () => void
-  onSubmit: (name: string) => Promise<void>
+  onSubmit: (data: { name: string; planned_date: string | null }) => Promise<void>
 }) {
   const [name, setName] = useState(initialName)
+  const [plannedDate, setPlannedDate] = useState(initialDate ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null); setSaving(true)
-    try { await onSubmit(name.trim()) }
+    try { await onSubmit({ name: name.trim(), planned_date: plannedDate || null }) }
     catch (e) { setError(e instanceof Error ? e.message : 'Error') }
     finally { setSaving(false) }
   }
 
   return (
-    <Modal size="sm" title="Renombrar lista" onClose={onClose}>
+    <Modal size="sm" title="Editar lista" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="rl-name" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -141,12 +143,21 @@ function RenameListModal({ initialName, onClose, onSubmit }: {
             required maxLength={150} className={cn(inputCls, 'w-full')}
           />
         </div>
+        <div>
+          <label htmlFor="rl-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Fecha de compra
+          </label>
+          <input id="rl-date" type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} className={cn(inputCls, 'w-full')} />
+          <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
+            Fecha en que se imputa en Egresos y fecha sugerida al enviar. Vacía = hoy.
+          </p>
+        </div>
         {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
           <button
             type="submit"
-            disabled={saving || !name.trim() || name.trim() === initialName}
+            disabled={saving || !name.trim() || (name.trim() === initialName && (plannedDate || null) === initialDate)}
             className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}
           >
             {saving ? 'Guardando…' : 'Guardar'}
@@ -295,7 +306,7 @@ type ModalState =
   | { type: 'edit-item'; item: ShoppingListItem }
   | { type: 'reset' }
   | { type: 'send' }
-  | { type: 'rename' }
+  | { type: 'edit-list' }
   | null
 
 export function ShoppingListDetailPage() {
@@ -370,9 +381,9 @@ export function ShoppingListDetailPage() {
     await load()
   }
 
-  async function handleRename(name: string) {
+  async function handleEditList(data: { name: string; planned_date: string | null }) {
     if (!id) return
-    await userApi.shoppingLists.update(id, { name })
+    await userApi.shoppingLists.update(id, data)
     setModal(null)
     await load()
   }
@@ -477,9 +488,9 @@ export function ShoppingListDetailPage() {
           <div className="flex items-center gap-2">
             <h1 className="min-w-0 break-words text-xl font-semibold text-gray-900 dark:text-slate-100">{list.name}</h1>
             <button
-              onClick={() => setModal({ type: 'rename' })}
-              title="Renombrar lista"
-              aria-label="Renombrar lista"
+              onClick={() => setModal({ type: 'edit-list' })}
+              title="Editar lista"
+              aria-label="Editar lista"
               className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <Pencil size={15} />
@@ -487,6 +498,7 @@ export function ShoppingListDetailPage() {
           </div>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
             {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedAmount, currency)}
+            {list.planned_date && <> · Fecha de compra: {list.planned_date.split('-').reverse().join('/')}</>}
           </p>
         </div>
         <SentStatusBadge sent={wasSent} />
@@ -564,8 +576,8 @@ export function ShoppingListDetailPage() {
         />
       )}
 
-      {modal?.type === 'rename' && (
-        <RenameListModal initialName={list.name} onClose={() => setModal(null)} onSubmit={handleRename} />
+      {modal?.type === 'edit-list' && (
+        <EditListModal initialName={list.name} initialDate={list.planned_date} onClose={() => setModal(null)} onSubmit={handleEditList} />
       )}
 
       {modal?.type === 'reset' && (
@@ -588,9 +600,10 @@ export function ShoppingListDetailPage() {
           currency={currency}
           defaultResponsible={userName}
           onClose={() => setModal(null)}
-          onSuccess={async () => {
+          onSuccess={async outcome => {
             setModal(null)
-            await load()
+            if (outcome === 'deleted') navigate('/listas-compra')
+            else await load()
           }}
         />
       )}
