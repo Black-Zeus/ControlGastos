@@ -300,6 +300,10 @@ async def update_shopping_list(
     current_user: User = Depends(get_current_user),
 ):
     shopping_list = await _get_list_or_404(list_id, current_user.id, db)
+    if body.name is not None:
+        body.name = body.name.strip()
+        if not body.name:
+            raise HTTPException(status_code=400, detail="El nombre de la lista no puede estar vacío")
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(shopping_list, field, value)
     await db.commit()

@@ -111,6 +111,52 @@ interface ItemFormData {
   obviable: boolean
 }
 
+// ─── Renombrar lista ──────────────────────────────────────────────────────────
+
+function RenameListModal({ initialName, onClose, onSubmit }: {
+  initialName: string
+  onClose: () => void
+  onSubmit: (name: string) => Promise<void>
+}) {
+  const [name, setName] = useState(initialName)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setError(null); setSaving(true)
+    try { await onSubmit(name.trim()) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Error') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Modal size="sm" title="Renombrar lista" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="rl-name" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Nombre <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="rl-name" autoFocus value={name} onChange={e => setName(e.target.value)}
+            required maxLength={150} className={cn(inputCls, 'w-full')}
+          />
+        </div>
+        {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
+          <button
+            type="submit"
+            disabled={saving || !name.trim() || name.trim() === initialName}
+            className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}
+          >
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 function ItemFormModal({ title, submitLabel, currency, initial, onClose, onSubmit }: {
   title: string
   submitLabel: string
@@ -249,6 +295,7 @@ type ModalState =
   | { type: 'edit-item'; item: ShoppingListItem }
   | { type: 'reset' }
   | { type: 'send' }
+  | { type: 'rename' }
   | null
 
 export function ShoppingListDetailPage() {
@@ -320,6 +367,13 @@ export function ShoppingListDetailPage() {
   async function toggleItemObviable(item: ShoppingListItem) {
     if (!id) return
     await userApi.shoppingLists.items.update(id, item.id, { obviable: !item.obviable })
+    await load()
+  }
+
+  async function handleRename(name: string) {
+    if (!id) return
+    await userApi.shoppingLists.update(id, { name })
+    setModal(null)
     await load()
   }
 
@@ -421,8 +475,18 @@ export function ShoppingListDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">{list.name}</h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="min-w-0 break-words text-xl font-semibold text-gray-900 dark:text-slate-100">{list.name}</h1>
+            <button
+              onClick={() => setModal({ type: 'rename' })}
+              title="Renombrar lista"
+              aria-label="Renombrar lista"
+              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
             {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedTotal, currency)}
           </p>
@@ -500,6 +564,10 @@ export function ShoppingListDetailPage() {
           onClose={() => setModal(null)}
           onSubmit={data => updateItemForm(modal.item, data)}
         />
+      )}
+
+      {modal?.type === 'rename' && (
+        <RenameListModal initialName={list.name} onClose={() => setModal(null)} onSubmit={handleRename} />
       )}
 
       {modal?.type === 'reset' && (
