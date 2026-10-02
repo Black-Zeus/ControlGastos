@@ -12,7 +12,7 @@ import {
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
-import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
+import { amountStepFor, parseAmountInput, fmtAmountInput, purchasedTotal } from '@/lib/money'
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
@@ -388,9 +388,7 @@ export function ShoppingListDetailPage() {
     return <p className="text-sm text-gray-400 dark:text-slate-500">Cargando…</p>
   }
 
-  const purchasedTotal = list.items
-    .filter(i => i.purchased)
-    .reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price ?? 0), 0)
+  const purchasedAmount = purchasedTotal(list.items)
   const wasSent = list.items.some(i => i.sent_at)
   const pendingCount = list.item_count - list.purchased_count
 
@@ -488,7 +486,7 @@ export function ShoppingListDetailPage() {
             </button>
           </div>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-            {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedTotal, currency)}
+            {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedAmount, currency)}
           </p>
         </div>
         <SentStatusBadge sent={wasSent} />
@@ -507,7 +505,7 @@ export function ShoppingListDetailPage() {
           <p className="text-xs text-gray-500 dark:text-slate-400">Pendientes</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">{pendingCount}</p>
         </div>
-        <KpiCard label="Total comprado" amount={purchasedTotal} currency={currency} color="text-primary-600 dark:text-primary-400" />
+        <KpiCard label="Total comprado" amount={purchasedAmount} currency={currency} color="text-primary-600 dark:text-primary-400" />
       </KpiGrid>
 
       <div className="flex justify-end gap-2">

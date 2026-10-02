@@ -30,3 +30,10 @@ export function fmtAmountInput(value: string, step: string): string {
   const dec = step === '1' ? 0 : 2
   return num.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
+
+/** Monto ya comprado de una lista de compra: Σ cantidad × precio unitario de los ítems marcados. */
+export function purchasedTotal(items: { purchased: boolean; quantity: string | number; unit_price: string | number | null }[]): number {
+  return items
+    .filter(i => i.purchased)
+    .reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price ?? 0), 0)
+}

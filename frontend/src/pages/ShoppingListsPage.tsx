@@ -12,6 +12,8 @@ import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToE
 import { useAuth } from '@/contexts/AuthContext'
 import { KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
+import { fmtMoney } from '@/components/ui/KpiCard'
+import { purchasedTotal } from '@/lib/money'
 
 function Field({ label, id, placeholder, required, value, onChange }: {
   label: string; id: string; placeholder?: string
@@ -207,6 +209,17 @@ export function ShoppingListsPage() {
           {l.purchased_count} / {l.item_count} comprados
         </span>
       ),
+    },
+    {
+      key: 'purchased_total', label: 'Comprado', headerClassName: 'text-right', className: 'text-right',
+      render: l => {
+        const amount = purchasedTotal(l.items)
+        return (
+          <span className={cn('whitespace-nowrap text-sm tabular-nums', amount > 0 ? 'font-medium text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-slate-500')}>
+            {amount > 0 ? fmtMoney(amount, currency) : '—'}
+          </span>
+        )
+      },
     },
     { key: 'archived', label: 'Archivo', sortable: true, render: l => <ArchivedBadge archived={l.archived} /> },
     { key: 'process_status', label: 'Estado', render: l => <ProcessingStatusBadge list={l} /> },
