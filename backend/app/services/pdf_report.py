@@ -434,13 +434,22 @@ def build_report_html(
 </html>"""
 
 
-async def generate_pdf(html_content: str) -> bytes:
+async def generate_pdf(html_content: str, *, full_bleed: bool = False) -> bytes:
+    """full_bleed=True quita los márgenes por defecto de Gotenberg (~1 cm) para que el
+    diseño llegue al borde de la hoja; los márgenes los maneja el propio HTML."""
     settings = get_settings()
     url = f"{settings.gotenberg_url}/forms/chromium/convert/html"
+    data = {
+        # Tamaño y márgenes desde el @page del HTML (A4, margen 0).
+        "preferCssPageSize": "true",
+        "marginTop": "0", "marginBottom": "0", "marginLeft": "0", "marginRight": "0",
+        "printBackground": "true",
+    } if full_bleed else None
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
             url,
             files={"index.html": ("index.html", html_content.encode("utf-8"), "text/html")},
+            data=data,
         )
         resp.raise_for_status()
     return resp.content
