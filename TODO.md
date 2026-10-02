@@ -4,14 +4,42 @@ Registro de funcionalidades pendientes y propuestas.
 
 ---
 
+## [EN PROGRESO] Optimización UI mobile — vistas de usuario mergeadas en `main`
+
+Especificación en `optimizacion_ui_mobile.md` (raíz). Breakpoint único: `sm` (640 px) de Tailwind;
+todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
+
+### Hecho
+
+- Componentes compartidos en `components/ui/`: `Modal`, `KpiCard` (unificada), `KpiGrid`,
+  `FormGrid` (`Grids.tsx`), `ScrollTable`; `FilterBar` con flujo vertical en mobile.
+- `AppLayout`: topbar sticky en mobile (el ☰ ya no tapa títulos). Eliminado `TopBar.tsx` (sin uso).
+- KPIs en 1 columna (mobile) / 2 (tablet) / N (desktop) en todas las vistas de usuario; montos
+  sin truncar.
+- Tablas: `DataTable` (datos con orden/paginación) y `ScrollTable` (resúmenes hechos a mano en
+  Dashboard y reportes). Se decidió **mantener los dos componentes**.
+- Modales: las copias locales se reemplazaron por `ui/Modal` (alto con `dvh`, cuerpo con scroll);
+  vista previa de PDF a pantalla completa en mobile.
+- Formularios de Ingreso, Egreso, Agregar producto, Nuevo período y Perfil en 1 columna.
+
+### Pendiente
+
+- **Panel admin** (fuera de alcance de esta tanda): KPIs `grid-cols-2`, copias locales de `Modal`
+  en `AdminCategories`/`AdminUsers`/`AdminIncomeTypes`, tabla de `AdminSettingsPage` sin
+  `ScrollTable`, grid de 3 columnas en `AdminIncomeTypesPage`.
+- Revisión visual completa en 320/360/375/390/412/430/480/768 px y desktop antes de mergear.
+- `npm run lint` no funciona: `eslint` no está en las dependencias del frontend.
+
+---
+
 ## [PENDIENTE] Egresos — mejoras de UX
 
-### Columna de acciones sobrecargada
+### ~~Columna de acciones sobrecargada~~ — resuelto en `fix/ui-mobile`
 
-La columna de acciones de la tabla de Egresos (`frontend/src/pages/ExpensesPage.tsx`) tiene
-demasiados botones por fila y se ve mal, sobre todo en pantallas angostas. Buscar una mejora
-visual; la opción candidata (aún no decidida) es dejar visibles solo las 1–2 acciones más usadas y
-mover el resto a un menú desplegable ("⋯") basado en las primitivas Radix de `components/ui/`.
+`DataTable` acepta `RowAction.primary`: si alguna acción lo marca, solo las primarias quedan como
+botón y el resto va a un menú "⋯" (Radix `DropdownMenu`). En Egresos quedan visibles **Editar** y
+**Pasar a saldado**. Pendiente evaluar: dejar también **Confirmar borrador** como primaria (solo
+en filas en borrador) y aplicar el mismo patrón a otras tablas con muchas acciones.
 
 ### Selección múltiple y acciones masivas
 
@@ -228,19 +256,16 @@ Ramas locales creadas tras el despliegue 0.3.0, aún **sin push**. Validar cada 
 merge a `main` o descarte. Las dos ramas no tienen conflictos entre sí (verificado con
 `git merge-tree`).
 
-### Rama `fix/numpy-cpu-produccion` — recomendación: merge pronto
+### ~~Rama `fix/numpy-cpu-produccion`~~ — mergeada en `main` (`bfa7ba3`)
 
-Sin este merge, el próximo `compose build` en producción vuelve a dejar caídos el backend y el
-`ocr-worker`.
-
-| Commit | Qué validar | Criterio |
-|---|---|---|
-| `0f01be9` fix(backend): pin numpy 2.3.5 | En el CT108: `docker compose ... build backend` y luego `docker run --rm --entrypoint python controlgastos-backend -c "import numpy, pandas, pytesseract"` sin error. En dev: exportación Excel/CSV y OCR siguen funcionando. | Merge si importa bien en el host de producción. Descartar solo si se cambia de host a uno con CPU x86-64-v2 o superior. |
-| `034e3f1` docs: pendientes de operación 0.3.0 | Que lo descrito (rutas, tags de imágenes, respaldos) coincida con el estado real del CT108. | Merge (solo documentación). |
-| `d6ff41c` docs: backlog de Listas de Compra y Egresos | Que los puntos reflejen lo pedido (editar título, listas visibles en Egresos, columna de acciones, selección masiva). | Merge (solo documentación). |
-| (este commit) docs: validación de ramas | Quitar esta sección una vez resueltas ambas ramas. | Merge (solo documentación). |
+Queda pendiente solo la verificación en el CT108 (`docker compose ... build backend` y el import de
+`numpy, pandas, pytesseract`), descrita en "Operación de producción".
 
 ### Rama `feature/integraciones-canales` — recomendación: no mergear hasta resolver el bloqueante
+
+> Nota dev: la DB de desarrollo ya tiene aplicada su migración `315c19dda564`; las ramas que no la
+> incluyen fallan al arrancar el backend (`Can't locate revision`). Mientras tanto, copiar el archivo
+> de migración sin versionarlo o hacer `alembic downgrade` desde esta rama.
 
 | Commit | Qué validar | Criterio |
 |---|---|---|

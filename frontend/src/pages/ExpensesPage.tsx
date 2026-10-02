@@ -17,6 +17,8 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
+import { FormGrid, KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,35 +138,6 @@ function DraftBadge() {
     <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 px-2.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-400">
       Borrador
     </span>
-  )
-}
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children, size = 'md' }: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-  size?: 'md' | 'lg' | 'xl' | '2xl'
-}) {
-  const maxW = { md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-5xl' }[size]
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative w-full rounded-2xl bg-white dark:bg-slate-900 shadow-xl my-auto', maxW)}>
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
   )
 }
 
@@ -411,12 +384,12 @@ function AttachmentViewerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-xl flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-xl flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]">
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-6 sm:py-4 shrink-0">
           <div className="min-w-0">
             {preview ? (
               <>
@@ -480,7 +453,7 @@ function AttachmentViewerModal({
               {attachments.length === 0 ? (
                 <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-8">Sin adjuntos</p>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {attachments.map(att => (
                     <button
                       key={att.id}
@@ -755,7 +728,7 @@ function ExpenseForm({
           )}
 
           {/* Fecha | Monto */}
-          <div className="grid grid-cols-2 gap-4">
+          <FormGrid>
             <div>
               <label className={labelCls}>Fecha <span className="text-red-500">*</span></label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} required min={dateMin} max={dateMax} className={inputCls} />
@@ -774,7 +747,7 @@ function ExpenseForm({
                 className={inputCls}
               />
             </div>
-          </div>
+          </FormGrid>
 
           {/* Categoría */}
           <div>
@@ -872,7 +845,7 @@ function ExpenseForm({
           </div>
 
           {/* Responsable | Obviable — cada uno en su columna */}
-          <div className="grid grid-cols-2 gap-4">
+          <FormGrid>
             <div>
               <label className={labelCls}>Responsable</label>
               <ResponsibleCombobox
@@ -902,7 +875,7 @@ function ExpenseForm({
                 </div>
               </button>
             </div>
-          </div>
+          </FormGrid>
 
           {/* Estado de pago — al final */}
           <div>
@@ -962,8 +935,8 @@ function ExpenseForm({
 
     {/* Overlay: la imagen propone datos distintos a los ya cargados — confirmar reemplazo */}
     {ocrProposal && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
+        <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
           <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
             El formulario ya tiene datos cargados. La imagen sugiere{' '}
@@ -1217,12 +1190,14 @@ export function ExpensesPage() {
     {
       icon:     Pencil,
       label:    'Editar',
+      primary:  true,
       disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'edit', expense }),
     },
     {
       icon:     CreditCard,
       label:    'Pasar a saldado',
+      primary:  true,
       disabled: e => e.payment_status !== 'pendiente' || !!periodClosed,
       onClick:  togglePayment,
     },
@@ -1298,12 +1273,12 @@ export function ExpensesPage() {
       </div>
 
       {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <KpiCard label="Total período"   amount={total}          currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
         <KpiCard label="Monto obviable"  amount={obviableTotal}  currency={currency} count={obviableCount}   color="text-primary-600 dark:text-primary-400" />
-      </div>
+      </KpiGrid>
 
       {draftCount > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-900/20 px-4 py-3">

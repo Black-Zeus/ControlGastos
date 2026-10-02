@@ -1,8 +1,9 @@
 import { useState, useEffect, Fragment, type ElementType } from 'react'
 import {
   ChevronUp, ChevronDown, ChevronsUpDown,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, MoreHorizontal,
 } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { cn } from '@/lib/utils'
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
@@ -24,6 +25,12 @@ export interface RowAction<T> {
   disabled?: (row: T) => boolean
   hidden?: (row: T) => boolean
   variant?: 'default' | 'danger' | ((row: T) => 'default' | 'danger')
+  /**
+   * Si alguna acción de la tabla lo marca, solo las `primary` se muestran como
+   * botón y el resto pasa a un menú "⋯" por fila. Sin ninguna marcada, todas se
+   * muestran como botón (comportamiento original).
+   */
+  primary?: boolean
 }
 
 interface DataTableProps<T> {
@@ -53,6 +60,64 @@ function getPageNumbers(current: number, total: number): (number | '…')[] {
 
 function getValue<T>(row: T, key: string): unknown {
   return (row as Record<string, unknown>)[key]
+}
+
+function resolveAction<T>(action: RowAction<T>, row: T) {
+  const Icon: ElementType = typeof action.icon === 'function'
+    ? (action.icon as (row: T) => ElementType)(row)
+    : action.icon
+  const label   = typeof action.label   === 'function' ? action.label(row)   : action.label
+  const variant = typeof action.variant === 'function' ? action.variant(row) : (action.variant ?? 'default')
+  const disabled = action.disabled?.(row) ?? false
+  return { Icon, label, variant, disabled }
+}
+
+// ─── Menú "⋯" de acciones secundarias ─────────────────────────────────────────
+
+function RowActionsMenu<T>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
+  if (actions.length === 0) return null
+  return (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button
+          title="Más acciones"
+          aria-label="Más acciones"
+          className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:data-[state=open]:bg-slate-800"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={4}
+          collisionPadding={8}
+          className="z-40 min-w-[200px] rounded-xl border border-gray-100 bg-white p-1 shadow-card dark:border-slate-700 dark:bg-slate-900"
+        >
+          {actions.map((action, ai) => {
+            const { Icon, label, variant, disabled } = resolveAction(action, row)
+            return (
+              <DropdownMenu.Item
+                key={ai}
+                disabled={disabled}
+                onSelect={() => action.onClick(row)}
+                className={cn(
+                  'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm outline-none transition-colors',
+                  'data-[disabled]:cursor-not-allowed data-[disabled]:text-gray-300 dark:data-[disabled]:text-slate-600',
+                  variant === 'danger'
+                    ? 'text-red-500 data-[highlighted]:bg-red-50 dark:data-[highlighted]:bg-red-900/20'
+                    : 'text-gray-700 data-[highlighted]:bg-gray-100 dark:text-slate-300 dark:data-[highlighted]:bg-slate-800',
+                )}
+              >
+                <Icon size={14} className="shrink-0" />
+                {label}
+              </DropdownMenu.Item>
+            )
+          })}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  )
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -115,6 +180,7 @@ export function DataTable<T>({
   }
 
   const hasActions = actions && actions.length > 0
+  const useOverflowMenu = !!actions?.some(a => a.primary)
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
@@ -208,14 +274,9 @@ export function DataTable<T>({
                   {hasActions && (
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5">
-                        {actions!.map((action, ai) => {
+                        {(useOverflowMenu ? actions!.filter(a => a.primary) : actions!).map((action, ai) => {
                           if (action.hidden?.(row)) return null
-                          const Icon: ElementType = typeof action.icon === 'function'
-                            ? (action.icon as (row: T) => ElementType)(row)
-                            : action.icon
-                          const label   = typeof action.label   === 'function' ? action.label(row)   : action.label
-                          const variant = typeof action.variant === 'function' ? action.variant(row) : (action.variant ?? 'default')
-                          const disabled = action.disabled?.(row) ?? false
+                          const { Icon, label, variant, disabled } = resolveAction(action, row)
                           return (
                             <button
                               key={ai}
@@ -235,6 +296,9 @@ export function DataTable<T>({
                             </button>
                           )
                         })}
+                        {useOverflowMenu && (
+                          <RowActionsMenu row={row} actions={actions!.filter(a => !a.primary && !a.hidden?.(row))} />
+                        )}
                       </div>
                     </td>
                   )}

@@ -70,7 +70,7 @@ function SearchableSelect({
   )
 
   return (
-    <div ref={ref} className="relative min-w-[140px]">
+    <div ref={ref} className="relative w-full sm:min-w-[140px]">
       <p className="mb-1 text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
       <button
         type="button"
@@ -140,7 +140,7 @@ function SimpleSelect({
   label: string
 }) {
   return (
-    <div className="min-w-[130px]">
+    <div className="w-full sm:min-w-[130px]">
       <p className="mb-1 text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
       <select
         value={value}
@@ -173,14 +173,14 @@ function RadioControl({
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
-      <div className="flex items-center gap-1 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+      <div className="flex w-full items-center gap-1 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 sm:w-auto">
         {options.map(opt => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap',
+              'flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap sm:flex-none sm:px-3',
               value === opt.value
                 ? 'bg-primary-500 text-white shadow-sm'
                 : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200',
@@ -265,7 +265,7 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
   const renderControl = (ctrl: FilterControlDef) => {
     if (ctrl.type === 'input') {
       return (
-        <div key={ctrl.key} className="flex-1 min-w-0">
+        <div key={ctrl.key} className="w-full min-w-0 sm:flex-1">
           <p className="mb-1 text-xs font-medium text-gray-500 dark:text-slate-400">{ctrl.label}</p>
           <input
             value={(values[ctrl.key] as string) ?? ''}
@@ -279,7 +279,7 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
     if (ctrl.type === 'select') {
       const val = (values[ctrl.key] as string) ?? ''
       return (
-        <div key={ctrl.key} className="flex-none">
+        <div key={ctrl.key} className="w-full min-w-0 sm:w-auto sm:flex-none">
           {ctrl.searchable ? (
             <SearchableSelect label={ctrl.label} options={ctrl.options} value={val} onChange={v => onChange(ctrl.key, v)} placeholder={ctrl.placeholder} />
           ) : (
@@ -290,14 +290,14 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
     }
     if (ctrl.type === 'radio') {
       return (
-        <div key={ctrl.key} className="flex-none">
+        <div key={ctrl.key} className="w-full min-w-0 sm:w-auto sm:flex-none">
           <RadioControl label={ctrl.label} options={ctrl.options} value={(values[ctrl.key] as string) ?? ''} onChange={v => onChange(ctrl.key, v)} />
         </div>
       )
     }
     if (ctrl.type === 'checkbox') {
       return (
-        <div key={ctrl.key} className="flex-none">
+        <div key={ctrl.key} className="w-full min-w-0 sm:w-auto sm:flex-none">
           <CheckboxControl label={ctrl.label} options={ctrl.options} values={(values[ctrl.key] as string[]) ?? []} onChange={v => onChange(ctrl.key, v)} />
         </div>
       )
@@ -312,10 +312,10 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
       disabled={!hasActiveFilter}
       aria-hidden={!hasActiveFilter}
       className={cn(
-        'flex flex-none items-center gap-1.5 self-end rounded-xl border px-3 py-2 text-sm transition-colors whitespace-nowrap',
+        'flex flex-none items-center justify-center gap-1.5 self-stretch rounded-xl border px-3 py-2 text-sm transition-colors whitespace-nowrap sm:self-end',
         hasActiveFilter
           ? 'border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 hover:border-gray-300 hover:text-gray-600 dark:hover:text-slate-300'
-          : 'invisible',
+          : 'hidden sm:invisible sm:flex',
       )}
     >
       <X size={13} /> Limpiar
@@ -323,7 +323,7 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
   ) : null
 
   const actionBtns = actions && actions.length > 0 ? (
-    <div className="flex items-end gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
       {actions.map((action, i) => {
         const Icon = action.icon
         const variant = action.variant ?? 'primary'
@@ -333,7 +333,7 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
             type="button"
             onClick={action.onClick}
             className={cn(
-              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap',
+              'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap sm:w-auto',
               variant === 'primary'
                 ? 'bg-primary-500 text-white hover:bg-primary-600'
                 : 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900',
@@ -349,15 +349,15 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
 
   return (
     <div className="flex flex-col gap-2 w-full">
-      {/* Fila 1: input(s) de búsqueda + botón de acción principal */}
-      <div className="flex items-end gap-3">
+      {/* Fila 1: input(s) de búsqueda + botón de acción principal (apilados en mobile) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         {inputCtrls.map(renderControl)}
         {actionBtns}
       </div>
 
-      {/* Fila 2: filtros select/radio/checkbox + limpiar (si los hay) */}
+      {/* Fila 2: filtros select/radio/checkbox + limpiar (columna única en mobile) */}
       {(otherCtrls.length > 0 || onClear) && (
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           {otherCtrls.map(renderControl)}
           {clearBtn}
         </div>

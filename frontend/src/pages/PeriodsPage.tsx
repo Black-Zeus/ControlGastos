@@ -8,6 +8,7 @@ import {
 import { userApi, Period, PeriodOpenOut } from '@/lib/userApi'
 import { cn } from '@/lib/utils'
 import { confirmedOnly } from '@/lib/reportUtils'
+import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 
 interface LiveSummary {
   totalIngresos: number
@@ -61,9 +62,9 @@ function KpiCard({
         <Icon size={20} className={c.icon} />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-gray-500 dark:text-slate-400 truncate">{label}</p>
-        <p className={cn('text-xl font-bold tabular-nums', c.value)}>{value}</p>
-        {sub && <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{sub}</p>}
+        <p className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
+        <p className={cn('break-words text-xl font-bold leading-tight tabular-nums', c.value)}>{value}</p>
+        {sub && <p className="text-xs text-gray-400 dark:text-slate-500">{sub}</p>}
       </div>
     </div>
   )
@@ -127,11 +128,8 @@ function PdfPreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-[10vh_10vw]">
-      <div
-        className="flex flex-col rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-slate-900"
-        style={{ width: '80vw', height: '80vh' }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[10vh_10vw]">
+      <div className="flex h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[80vh] sm:w-[80vw]">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
@@ -246,7 +244,7 @@ function OpenPeriodModal({
             </div>
           ) : (
             /* Primer período: dropdowns libres */
-            <div className="grid grid-cols-2 gap-3">
+            <FormGrid className="gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Mes</label>
                 <select
@@ -269,7 +267,7 @@ function OpenPeriodModal({
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
-            </div>
+            </FormGrid>
           )}
 
           {error && (
@@ -598,7 +596,7 @@ function PeriodCard({
 
       {expanded && (
         <div className="px-5 pb-4 border-t border-gray-100 dark:border-slate-800">
-          <div className="grid grid-cols-3 gap-3 mt-4 mb-4">
+          <div className="grid grid-cols-1 gap-2 mt-4 mb-4 sm:grid-cols-3 sm:gap-3">
             <div className="rounded-xl bg-green-50 dark:bg-green-900/10 p-3 text-center">
               <TrendingUp size={14} className="mx-auto mb-1 text-green-500" />
               <p className="text-[10px] text-gray-500 dark:text-slate-400 mb-0.5">Ingresos</p>
@@ -816,7 +814,7 @@ export function PeriodsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <KpiCard icon={CalendarRange} label="Total períodos"    value={String(periods.length)}                              color="blue" />
         <KpiCard icon={openPeriod ? Unlock : Lock} label="Período activo"
           value={openPeriod ? fmtPeriod(openPeriod.year, openPeriod.month) : 'Ninguno'}
@@ -826,7 +824,7 @@ export function PeriodsPage() {
         <KpiCard icon={Scale} label="Balance histórico"
           value={closedPeriods.length > 0 ? fmtMoney(totalBalance) : '—'}
           color={totalBalance >= 0 ? 'green' : 'red'} />
-      </div>
+      </KpiGrid>
 
       {/* Estado vacío / loading / error */}
       {loading && (

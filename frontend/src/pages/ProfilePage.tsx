@@ -6,6 +6,7 @@ import { userApi } from '@/lib/userApi'
 import { useUserStore } from '@/stores/userStore'
 import { useAvatarUrl } from '@/hooks/useAvatarUrl'
 import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
+import { FormGrid } from '@/components/ui/Grids'
 
 // ─── Zona horaria del navegador ───────────────────────────────────────────────
 
@@ -343,7 +344,7 @@ function ProfileInfoForm({
     <form onSubmit={handleSave} className="flex flex-col flex-1 gap-4">
       <div className="flex-1 space-y-4">
         {/* Nombre | Correo — misma fila */}
-        <div className="grid grid-cols-2 gap-4">
+        <FormGrid>
           <div>
             <label className={labelCls}>Nombre completo <span className="text-red-500">*</span></label>
             <input
@@ -363,10 +364,10 @@ function ProfileInfoForm({
               className={cn(inputCls, 'bg-gray-50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-500 select-none')}
             />
           </div>
-        </div>
+        </FormGrid>
 
         {/* Moneda | Zona horaria */}
-        <div className="grid grid-cols-2 gap-4">
+        <FormGrid>
           <div>
             <label className={labelCls}>Moneda <span className="text-red-500">*</span></label>
             <select value={currency} onChange={e => setCurrency(e.target.value)} required className={inputCls}>
@@ -400,13 +401,13 @@ function ProfileInfoForm({
               Detectada: <span className="font-medium text-gray-500 dark:text-slate-400">{BROWSER_TZ}</span>
             </p>
           </div>
-        </div>
+        </FormGrid>
       </div>
 
       {/* Fila de acciones — pegada al fondo de la card */}
-      <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-4">
+      <div className="flex flex-col gap-3 border-t border-gray-100 dark:border-slate-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Indicador de cambios pendientes */}
-        <div className="min-w-0 mr-4">
+        <div className="min-w-0 sm:mr-4">
           {hasPendingChanges && !saving && (
             <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
               <AlertCircle size={13} className="shrink-0" />
@@ -417,7 +418,7 @@ function ProfileInfoForm({
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors sm:w-auto"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -488,7 +489,7 @@ function PasswordForm() {
         </div>
 
         {/* Nueva | Confirmar — misma fila */}
-        <div className="grid grid-cols-2 gap-4">
+        <FormGrid>
           <div>
             <label className={labelCls}>Nueva contraseña <span className="text-red-500">*</span></label>
             <div className="relative">
@@ -517,13 +518,13 @@ function PasswordForm() {
               <EyeToggle visible={showNew} onToggle={() => setShowNew(v => !v)} />
             </div>
           </div>
-        </div>
+        </FormGrid>
 
       </div>
 
       {/* Fondo: fortaleza + info (izq) | botón (der) */}
-      <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-4">
-        <div className="flex-1 min-w-0 mr-6">
+      <div className="flex flex-col gap-3 border-t border-gray-100 dark:border-slate-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 min-w-0 sm:mr-6">
           <PasswordStrengthBar password={next} />
           {next && conf && next !== conf && (
             <p className="mt-1.5 flex items-center gap-1 text-xs text-red-500">
@@ -535,7 +536,7 @@ function PasswordForm() {
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors sm:w-auto"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? 'Actualizando…' : 'Cambiar contraseña'}
@@ -664,7 +665,7 @@ function NotificationsForm() {
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60 transition-colors sm:w-auto"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? 'Guardando…' : 'Guardar preferencia'}
@@ -736,7 +737,7 @@ export function ProfilePage() {
       <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-soft overflow-hidden">
         <div className="h-24 bg-gradient-to-r from-primary-400 to-primary-600 dark:from-primary-700 dark:to-primary-900" />
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5 px-8 pb-6 -mt-12">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5 px-4 pb-6 -mt-12 sm:px-8">
           <AvatarZone
             displaySrc={displaySrc}
             hasPending={pendingPreviewUrl !== null}
@@ -749,7 +750,7 @@ export function ProfilePage() {
           />
           <div className="sm:mb-1 flex-1 min-w-0">
             <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 truncate">{user?.name}</h2>
-            <p className="text-sm text-gray-500 dark:text-slate-400">{user?.email}</p>
+            <p className="break-words text-sm text-gray-500 dark:text-slate-400">{user?.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <span className="inline-flex items-center rounded-full bg-primary-50 dark:bg-primary-900/30 px-2.5 py-0.5 text-xs font-medium text-primary-700 dark:text-primary-400">
                 {user?.currency} — {currLabel}
@@ -765,7 +766,7 @@ export function ProfilePage() {
       {/* Panel de configuración: secciones título/descripción + campos, en una sola card */}
       <div className="divide-y divide-gray-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-soft">
 
-        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+        <section className="grid grid-cols-1 gap-5 p-4 sm:p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
           <div>
             <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Información personal</h3>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
@@ -781,7 +782,7 @@ export function ProfilePage() {
           />
         </section>
 
-        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+        <section className="grid grid-cols-1 gap-5 p-4 sm:p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
           <div>
             <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Seguridad</h3>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
@@ -791,7 +792,7 @@ export function ProfilePage() {
           <PasswordForm />
         </section>
 
-        <section className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
+        <section className="grid grid-cols-1 gap-5 p-4 sm:p-6 lg:grid-cols-[220px_1fr] lg:gap-10">
           <div>
             <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">Notificaciones</h3>
             <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-slate-400">

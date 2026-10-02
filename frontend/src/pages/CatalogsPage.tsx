@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, X, Tags, TrendingUp, ToggleLeft, ToggleRight, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tags, TrendingUp, ToggleLeft, ToggleRight, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   userApi,
@@ -8,6 +8,8 @@ import {
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -40,29 +42,6 @@ function ActiveBadgeIT({ active }: { active: boolean }) {
     <span className="inline-flex rounded-full bg-green-50 dark:bg-green-900/30 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
   ) : (
     <span className="inline-flex rounded-full bg-gray-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-400">Inactivo</span>
-  )
-}
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
   )
 }
 
@@ -280,7 +259,7 @@ function CategoriesTab() {
   return (
     <div className="space-y-4">
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',    value: stats.total,    color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Sistema',  value: stats.system,   color: 'text-gray-500 dark:text-slate-400' },
@@ -292,7 +271,7 @@ function CategoriesTab() {
             <p className={cn('mt-0.5 text-xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <FilterBar
         controls={CAT_FILTERS}
@@ -315,7 +294,7 @@ function CategoriesTab() {
       />
 
       {modal?.type === 'create' && (
-        <Modal title="Nueva categoría personal" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Nueva categoría personal" onClose={() => setModal(null)}>
           <CategoryForm submitLabel="Crear" onCancel={() => setModal(null)}
             onSubmit={async data => {
               await userApi.categories.create(data)
@@ -326,7 +305,7 @@ function CategoriesTab() {
         </Modal>
       )}
       {modal?.type === 'edit' && (
-        <Modal title={`Editar — ${modal.cat.name}`} onClose={() => setModal(null)}>
+        <Modal size="sm" title={`Editar — ${modal.cat.name}`} onClose={() => setModal(null)}>
           <CategoryForm initial={modal.cat as CategoryUpdatePayload} submitLabel="Guardar" onCancel={() => setModal(null)}
             onSubmit={async data => {
               await userApi.categories.update(modal.cat.id, data)
@@ -337,7 +316,7 @@ function CategoriesTab() {
         </Modal>
       )}
       {modal?.type === 'toggle' && (
-        <Modal title={modal.cat.active ? 'Desactivar categoría' : 'Activar categoría'} onClose={() => setModal(null)}>
+        <Modal size="sm" title={modal.cat.active ? 'Desactivar categoría' : 'Activar categoría'} onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             {modal.cat.active
               ? <>¿Desactivar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.cat.name}"</span>? Dejará de aparecer en el formulario de egresos.</>
@@ -354,7 +333,7 @@ function CategoriesTab() {
         </Modal>
       )}
       {modal?.type === 'delete' && (
-        <Modal title="Eliminar categoría" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Eliminar categoría" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             ¿Eliminar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.cat.name}"</span>?
             Los egresos existentes que usen esta categoría no se verán afectados.
@@ -494,7 +473,7 @@ function IncomeTypesTab() {
   return (
     <div className="space-y-4">
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',    value: stats.total,    color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Sistema',  value: stats.system,   color: 'text-gray-500 dark:text-slate-400' },
@@ -506,7 +485,7 @@ function IncomeTypesTab() {
             <p className={cn('mt-0.5 text-xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <FilterBar
         controls={IT_FILTERS}
@@ -529,7 +508,7 @@ function IncomeTypesTab() {
       />
 
       {modal?.type === 'edit' && (
-        <Modal title={`Editar — ${modal.it.name}`} onClose={() => setModal(null)}>
+        <Modal size="sm" title={`Editar — ${modal.it.name}`} onClose={() => setModal(null)}>
           <form onSubmit={handleEdit} className="space-y-4">
             <Field label="Nombre" id="it-edit-name" value={editName} onChange={setEditName} placeholder="Ej: Comisión" required />
             {editErr && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{editErr}</p>}
@@ -543,7 +522,7 @@ function IncomeTypesTab() {
         </Modal>
       )}
       {modal?.type === 'create' && (
-        <Modal title="Nuevo tipo de ingreso personal" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Nuevo tipo de ingreso personal" onClose={() => setModal(null)}>
           <form onSubmit={handleCreate} className="space-y-4">
             <Field label="Nombre" id="it-name" value={newName} onChange={setNewName} placeholder="Ej: Comisión" required />
             {saveErr && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{saveErr}</p>}
@@ -557,7 +536,7 @@ function IncomeTypesTab() {
         </Modal>
       )}
       {modal?.type === 'toggle' && (
-        <Modal title={modal.it.active ? 'Desactivar tipo' : 'Activar tipo'} onClose={() => setModal(null)}>
+        <Modal size="sm" title={modal.it.active ? 'Desactivar tipo' : 'Activar tipo'} onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             {modal.it.active
               ? <>¿Desactivar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.it.name}"</span>? Dejará de aparecer en el formulario de ingresos.</>
@@ -574,7 +553,7 @@ function IncomeTypesTab() {
         </Modal>
       )}
       {modal?.type === 'delete' && (
-        <Modal title="Eliminar tipo de ingreso" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Eliminar tipo de ingreso" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             ¿Eliminar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.it.name}"</span>?
           </p>
