@@ -139,6 +139,14 @@ export interface AttachmentOut {
   uploaded_at: string
 }
 
+export type BulkAction = 'confirm' | 'mark_paid' | 'delete'
+
+export interface BulkResult {
+  action: BulkAction
+  done: string[]
+  failed: { id: string; reason: string }[]
+}
+
 export interface ExpenseCreatePayload {
   date: string
   label: string
@@ -350,6 +358,8 @@ export const userApi = {
     },
     create: (body: ExpenseCreatePayload)                 => request<Expense>('/v1/expenses', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: ExpenseUpdatePayload)     => request<Expense>(`/v1/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    /** Acción masiva: cada egreso se valida aparte; los que no cumplen vuelven en `failed` con su motivo. */
+    bulk:   (ids: string[], action: BulkAction)          => request<BulkResult>('/v1/expenses/bulk', { method: 'POST', body: JSON.stringify({ ids, action }) }),
     delete: (id: string)                                 => request<void>(`/v1/expenses/${id}`, { method: 'DELETE' }),
     ocrPreview: (file: File)                             => {
       const fd = new FormData()

@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, type ElementType } from 'react'
+import { useState, useEffect, useRef, Fragment, type ElementType } from 'react'
 import {
   ChevronUp, ChevronDown, ChevronsUpDown,
   ChevronLeft, ChevronRight, MoreHorizontal,
@@ -49,6 +49,14 @@ interface DataTableProps<T> {
   renderExpanded?: (row: T) => React.ReactNode
   /** Orden inicial (el usuario puede cambiarlo haciendo clic en las cabeceras). */
   defaultSort?: { key: string; dir: 'asc' | 'desc' }
+  /**
+   * Selección múltiple: si se provee, agrega una columna de casillas. Solo las filas para
+   * las que retorna true son seleccionables; "seleccionar todo" abarca todas las filas de
+   * `data` (todas las páginas), no solo la visible. Controlado con selectedKeys/onSelectionChange.
+   */
+  selectable?: (row: T) => boolean
+  selectedKeys?: Set<string | number>
+  onSelectionChange?: (keys: Set<string | number>) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,6 +80,30 @@ function resolveAction<T>(action: RowAction<T>, row: T) {
   const variant = typeof action.variant === 'function' ? action.variant(row) : (action.variant ?? 'default')
   const disabled = action.disabled?.(row) ?? false
   return { Icon, label, variant, disabled }
+}
+
+// ─── Casilla de selección (con estado indeterminado) ───────────────────────────
+
+function SelectCheckbox({ checked, indeterminate = false, disabled = false, onChange, label }: {
+  checked: boolean
+  indeterminate?: boolean
+  disabled?: boolean
+  onChange: () => void
+  label: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (ref.current) ref.current.indeterminate = indeterminate }, [indeterminate])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+      aria-label={label}
+      className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-primary-500 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-600"
+    />
+  )
 }
 
 // ─── Menú "⋯" de acciones secundarias ─────────────────────────────────────────
@@ -137,6 +169,9 @@ export function DataTable<T>({
   isExpandable,
   renderExpanded,
   defaultSort,
+  selectable,
+  selectedKeys,
+  onSelectionChange,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey]   = useState<string | null>(defaultSort?.key ?? null)
   const [sortDir, setSortDir]   = useState<'asc' | 'desc'>(defaultSort?.dir ?? 'asc')
@@ -183,6 +218,26 @@ export function DataTable<T>({
   }
 
   const hasActions = actions && actions.length > 0
+
+  // ── Selección ────────────────────────────────────────────────────────────
+  const hasSelection = !!selectable && !!onSelectionChange
+  const selected = selectedKeys ?? new Set<string | number>()
+  const selectableKeys = hasSelection ? data.filter(r => selectable!(r)).map(rowKey) : []
+  const selectedCount = selectableKeys.filter(k => selected.has(k)).length
+  const allSelected = selectableKeys.length > 0 && selectedCount === selectableKeys.length
+
+  function toggleRow(key: string | number) {
+    const next = new Set(selected)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    onSelectionChange!(next)
+  }
+
+  function toggleAll() {
+    onSelectionChange!(allSelected ? new Set() : new Set(selectableKeys))
+  }
+
+  const extraCols = (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0) + (hasSelection ? 1 : 0)
   const useOverflowMenu = !!actions?.some(a => a.primary)
 
   return (
@@ -202,6 +257,17 @@ export function DataTable<T>({
           <table className="w-full min-w-max text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-slate-800">
+                {hasSelection && (
+                  <th className="w-10 py-3 pl-4 pr-1">
+                    <SelectCheckbox
+                      checked={allSelected}
+                      indeterminate={selectedCount > 0 && !allSelected}
+                      disabled={selectableKeys.length === 0}
+                      onChange={toggleAll}
+                      label="Seleccionar todos"
+                    />
+                  </th>
+                )}
                 {renderExpanded && <th className="w-8 px-2 py-3" />}
                 {columns.map(col => (
                   <th
@@ -238,7 +304,7 @@ export function DataTable<T>({
               {!loading && rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={columns.length + (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0)}
+                    colSpan={columns.length + extraCols}
                     className="py-12 text-center text-sm text-gray-400 dark:text-slate-500"
                   >
                     {emptyMessage}
@@ -252,8 +318,20 @@ export function DataTable<T>({
                 return (
                 <Fragment key={key}>
                 <tr
-                  className="hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors"
+                  className={cn(
+                    'transition-colors',
+                    hasSelection && selected.has(key)
+                      ? 'bg-primary-50/60 dark:bg-primary-900/10'
+                      : 'hover:bg-gray-50 dark:hover:bg-slate-800/40',
+                  )}
                 >
+                  {hasSelection && (
+                    <td className="py-3 pl-4 pr-1">
+                      {selectable!(row) && (
+                        <SelectCheckbox checked={selected.has(key)} onChange={() => toggleRow(key)} label="Seleccionar fila" />
+                      )}
+                    </td>
+                  )}
                   {renderExpanded && (
                     <td className="px-2 py-3">
                       {canExpand && (
@@ -308,7 +386,7 @@ export function DataTable<T>({
                 </tr>
                 {isOpen && (
                   <tr className="bg-gray-50/60 dark:bg-slate-800/30">
-                    <td colSpan={columns.length + (hasActions ? 1 : 0) + 1} className="px-4 py-3">
+                    <td colSpan={columns.length + extraCols} className="px-4 py-3">
                       {renderExpanded!(row)}
                     </td>
                   </tr>

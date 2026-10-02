@@ -11,7 +11,7 @@ import {
   userApi, authToken,
   type Expense, type AttachmentOut, type ShoppingList,
   type ExpenseCreatePayload, type ExpenseUpdatePayload, type ExpenseItem,
-  type UserCategory, type Period, type OcrPreview, type Income,
+  type UserCategory, type Period, type OcrPreview, type Income, type BulkAction,
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
@@ -1095,6 +1095,7 @@ type ModalState =
   | { type: 'attachments'; expense: Expense; att?: AttachmentOut }
   | { type: 'shopping-list-preview'; listId: string }
   | { type: 'to-list'; expense: Expense }
+  | { type: 'bulk'; action: BulkAction; eligible: Expense[]; skipped: number }
   | null
 
 type Filters = Record<string, string | string[]>
@@ -1158,6 +1159,8 @@ export function ExpensesPage() {
   const [incomes, setIncomes]       = useState<Income[]>([])
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([])
   const [range, setRange]           = useState<DateRange>(EMPTY_RANGE)
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set())
+  const [bulkResult, setBulkResult]   = useState<{ text: string; failures: string[] } | null>(null)
   const [categories, setCategories] = useState<UserCategory[]>([])
   const [allPeriods, setAllPeriods] = useState<Period[]>([])
   const [period, setPeriod]         = useState<Period | null>(null)
@@ -1208,7 +1211,7 @@ export function ExpensesPage() {
   const periodClosed = period?.status === 'cerrado'
 
   // El rango de fechas es relativo al período visible: se limpia al cambiar de período.
-  function goToPeriod(p: { year: number; month: number }) { setYear(p.year); setMonth(p.month); setRange(EMPTY_RANGE) }
+  function goToPeriod(p: { year: number; month: number }) { setYear(p.year); setMonth(p.month); setRange(EMPTY_RANGE); setSelectedIds(new Set()) }
   function prevPeriod() { if (canGoPrev) goToPeriod(allPeriods[periodIdx + 1]) }
   function nextPeriod() { if (canGoNext) goToPeriod(allPeriods[periodIdx - 1]) }
   function jumpToOpenPeriod() { if (openPeriod) goToPeriod(openPeriod) }
@@ -1288,6 +1291,34 @@ export function ExpensesPage() {
     : { min: undefined, max: undefined }
   const rangeExceedsPeriod = isRangeActive(range) && !!periodBounds.min &&
     ((!!range.from && range.from < periodBounds.min) || (!!range.to && range.to > periodBounds.max!))
+
+  // ── Acciones masivas ─────────────────────────────────────────────────────
+  // Solo cuenta lo seleccionado que sigue visible con los filtros actuales.
+  const selectedRows = filtered.filter(e => selectedIds.has(e.id))
+  const BULK_RULES: Record<BulkAction, { label: string; verb: string; eligible: (e: Expense) => boolean }> = {
+    confirm:   { label: 'Confirmar borradores', verb: 'confirmados',        eligible: e => e.review_status === 'borrador' && Number(e.amount) > 0 },
+    mark_paid: { label: 'Pasar a pagado',       verb: 'pasados a pagado',   eligible: e => e.review_status === 'confirmado' && e.payment_status === 'pendiente' },
+    delete:    { label: 'Eliminar',             verb: 'eliminados',         eligible: () => true },
+  }
+
+  function openBulk(action: BulkAction) {
+    const eligible = selectedRows.filter(BULK_RULES[action].eligible)
+    setModal({ type: 'bulk', action, eligible, skipped: selectedRows.length - eligible.length })
+  }
+
+  async function runBulk(action: BulkAction, rows: Expense[]) {
+    try {
+      const res = await userApi.expenses.bulk(rows.map(e => e.id), action)
+      const byId = new Map(rows.map(e => [e.id, e]))
+      setBulkResult({
+        text: `${res.done.length} ${res.done.length === 1 ? 'egreso' : 'egresos'} ${BULK_RULES[action].verb}.`,
+        failures: res.failed.map(f => `${byId.get(f.id)?.label ?? f.id}: ${f.reason}`),
+      })
+      setSelectedIds(new Set())
+      setModal(null)
+      await load()
+    } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
+  }
 
   async function handleToList(expense: Expense) {
     try {
@@ -1594,7 +1625,62 @@ export function ExpensesPage() {
         actions={periodClosed ? [] : [{ label: 'Nuevo egreso', icon: Plus, onClick: () => setModal({ type: 'create' }) }]}
       />
 
+      {bulkResult && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400">
+          <div className="min-w-0">
+            <p className="font-medium">{bulkResult.text}</p>
+            {bulkResult.failures.length > 0 && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-700 dark:text-amber-400">
+                {bulkResult.failures.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            )}
+          </div>
+          <button onClick={() => setBulkResult(null)} aria-label="Cerrar aviso" className="shrink-0 rounded-lg p-1 hover:bg-green-100 dark:hover:bg-green-900/30">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Barra de acciones masivas: aparece al seleccionar; cada botón indica a cuántos aplica */}
+      {selectedRows.length > 0 && (
+        <div className="sticky top-16 z-20 flex flex-col gap-2 rounded-xl border border-primary-200 bg-white px-3 py-2.5 shadow-card dark:border-primary-900/40 dark:bg-slate-900 sm:flex-row sm:flex-wrap sm:items-center lg:top-2">
+          <p className="text-sm font-medium text-gray-700 dark:text-slate-300 sm:mr-auto">
+            {selectedRows.length} {selectedRows.length === 1 ? 'seleccionado' : 'seleccionados'}
+          </p>
+          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
+            {(['confirm', 'mark_paid', 'delete'] as BulkAction[]).map(action => {
+              const count = selectedRows.filter(BULK_RULES[action].eligible).length
+              return (
+                <button
+                  key={action}
+                  onClick={() => openBulk(action)}
+                  disabled={count === 0}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                    action === 'delete'
+                      ? 'border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20'
+                      : 'bg-primary-500 text-white hover:bg-primary-600',
+                  )}
+                >
+                  {action === 'confirm' ? <Check size={14} /> : action === 'mark_paid' ? <CreditCard size={14} /> : <Trash2 size={14} />}
+                  {BULK_RULES[action].label} ({count})
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              Quitar selección
+            </button>
+          </div>
+        </div>
+      )}
+
       <DataTable
+        selectable={periodClosed ? undefined : e => !isListDraft(e)}
+        selectedKeys={selectedIds}
+        onSelectionChange={setSelectedIds}
         data={filtered}
         columns={columns}
         actions={actions}
@@ -1680,6 +1766,42 @@ export function ExpensesPage() {
           <div className="mt-5 flex gap-3">
             <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
             <button onClick={() => handleDelete(modal.expense)} className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors">Eliminar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'bulk' && (
+        <Modal size="sm" title={BULK_RULES[modal.action].label} onClose={() => setModal(null)}>
+          <div className="space-y-3 text-sm text-gray-600 dark:text-slate-400">
+            <p>
+              Se aplicará a <span className="font-semibold text-gray-900 dark:text-slate-100">{modal.eligible.length}</span>{' '}
+              {modal.eligible.length === 1 ? 'egreso' : 'egresos'} por{' '}
+              <span className="font-semibold">{fmtMoney(modal.eligible.reduce((s, e) => s + Number(e.amount), 0), currency)}</span>.
+            </p>
+            {modal.skipped > 0 && (
+              <p className="text-xs text-gray-400 dark:text-slate-500">
+                {modal.skipped} de los seleccionados no {modal.skipped === 1 ? 'aplica' : 'aplican'} y se {modal.skipped === 1 ? 'omite' : 'omiten'}
+                {modal.action === 'mark_paid' && ' (borradores o ya pagados)'}
+                {modal.action === 'confirm' && ' (no son borradores o no tienen monto)'}.
+              </p>
+            )}
+            {modal.action === 'delete' && (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                Se eliminarán junto con sus adjuntos. Esta acción no se puede deshacer.
+              </p>
+            )}
+          </div>
+          <div className="mt-5 flex gap-3">
+            <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+            <button
+              onClick={() => runBulk(modal.action, modal.eligible)}
+              className={cn(
+                'flex-1 rounded-xl py-2.5 text-sm font-semibold text-white transition-colors',
+                modal.action === 'delete' ? 'bg-red-500 hover:bg-red-600' : 'bg-primary-500 hover:bg-primary-600',
+              )}
+            >
+              {BULK_RULES[modal.action].label}
+            </button>
           </div>
         </Modal>
       )}
