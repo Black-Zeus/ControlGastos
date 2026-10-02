@@ -5,7 +5,82 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
-## 0.3.0 — En curso
+## 0.4.0 — Pendiente de despliegue
+
+Preparada el 2026-10-02; se despliega en producción la semana siguiente.
+
+### Antes de desplegar (checklist)
+
+- **Respaldo**: `pg_dump` de la base y copia de MinIO. Esta versión trae **3 migraciones**
+  (`315c19dda564`, `c7d8e9f0a1b2`, `99e116fc4116`) y una imagen anterior no arranca contra una base
+  ya migrada (ver "Procedimiento de despliegue y rollback" en `TODO.md`).
+- **`INTEGRATION_KEY`** en `.env.prd` (`openssl rand -hex 32`) y la misma clave en n8n como header
+  `X-Integration-Key`. Sin ella, la vinculación y la ingesta por canal responden 503.
+- Gotenberg operativo (lo usa el nuevo PDF de evidencia de listas de compra).
+
+### Integraciones: Telegram / WhatsApp vía n8n
+
+- Vinculación de canales: el usuario genera un código en **Integraciones**, lo envía por el canal y
+  n8n confirma el vínculo (`POST /channels/link`). Luego la ingesta acepta `X-Channel` +
+  `X-Channel-Id` en vez del token de ingesta.
+- Seguridad: esas rutas exigen `X-Integration-Key` (comparación en tiempo constante contra
+  `INTEGRATION_KEY`); sin la variable configurada quedan deshabilitadas.
+- Panel admin con navegación agrupada por secciones y guías nuevas en Ayuda.
+
+### Interfaz mobile (320–480 px)
+
+- Topbar fija en mobile (el botón de menú ya no tapa títulos).
+- Componentes compartidos: `Modal`, `KpiCard`, `KpiGrid`, `FormGrid`, `ScrollTable`,
+  `DateRangeFilter`; `FilterBar` en columna en mobile.
+- KPIs, formularios y totales en una columna en teléfono; tablas con scroll horizontal; modales
+  con alto acotado (`dvh`); vista previa de PDF a pantalla completa. Aplica también al panel admin.
+- Los modales solo se cierran con sus controles (no al tocar fuera).
+- `DataTable`: menú "⋯" para acciones secundarias, orden por defecto y selección múltiple.
+
+### Egresos
+
+- **Rango de fechas** (Desde/Hasta + atajos Hoy, Esta semana, 7 y 15 días) que filtra la tabla y
+  recalcula los KPIs; orden por fecha por defecto.
+- **Disponible**: ingresos del período − ya pagado − pendiente en la vista − listas en curso.
+- **Desglose manual de ítems** en el formulario; con desglose el monto es siempre la suma de los
+  ítems (bloqueado en formulario y API).
+- **Acciones masivas**: seleccionar egresos y Confirmar borradores, Pasar a pagado o Eliminar en
+  bloque; cada acción indica a cuántos aplica y el resultado detalla los omitidos y su motivo.
+- "Confirmar borrador" visible directamente en las filas en borrador.
+
+### Listas de compra
+
+- Renombrar la lista y **fecha de compra** (fecha en que se imputa la compra).
+- **Borrador en Egresos**: cada lista activa con compras sin enviar aparece como fila de solo
+  lectura "Lista compra [Borrador] - nombre" (no suma en KPIs; "Editar lista" lleva a la lista).
+- **Cada envío crea un egreso nuevo** (p. ej. la feria semanal) con un **PDF de evidencia**
+  adjunto: productos, cantidades, precios y fechas de creación, compra, egreso y envío.
+- Tras enviar se elige obligatoriamente: dejar la lista como plantilla o eliminarla.
+- Descripción editable al enviar (por defecto, el nombre de la lista); la nota pasa a llamarse
+  "Observación".
+- Los ítems y el monto de un egreso de lista quedan bloqueados aunque la lista se elimine;
+  **"Devolver a lista de compra"** convierte el egreso en una lista para corregirlo y reenviarlo.
+- Columna "Comprado" con el monto ya marcado en cada lista.
+
+### Reglas y correcciones
+
+- **Regla de período**: egresos, ingresos, recibos de ingesta, fecha de compra de listas y su
+  envío solo aceptan fechas dentro del período abierto (validado en backend).
+- La fecha de "hoy" se calcula en hora local / zona del usuario (antes UTC: de noche proponía el
+  día siguiente).
+- Al eliminar un egreso se borran también sus archivos en MinIO (antes quedaban huérfanos).
+- Fechas sin hora mostradas sin desfase UTC en Listas de compra.
+
+### Infraestructura y calidad
+
+- Migraciones: `315c19dda564` (canales), `c7d8e9f0a1b2` (`shopping_lists.planned_date`),
+  `99e116fc4116` (`expenses.items_from_list`, con backfill de los egresos que ya tenían ítems).
+- Nueva variable `INTEGRATION_KEY` en los tres compose y en `.env.example`.
+- ESLint 10 (flat config) instalado y `npm run lint` en verde.
+
+---
+
+## 0.3.0 — Desplegada el 2026-10-01
 
 ### Nueva funcionalidad: ingesta de recibos por bot (OCR)
 

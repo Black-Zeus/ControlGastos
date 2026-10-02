@@ -34,8 +34,6 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
 
 ## [PENDIENTE] Mejoras rápidas sugeridas (revisión 2026-10-02)
 
-- **Versión 0.4.0** antes del despliegue: `frontend/package.json`, `version=` en
-  `backend/app/main.py` y entrada en `fixVersion.md` (todo lo hecho desde la 0.3.0).
 - **Rango de fechas en Ingresos**: reutilizar `ui/DateRangeFilter` (mismos atajos) y que los KPIs
   se recalculen con el rango, como en Egresos.
 - **Egresos recuerda mes y rango en la URL** (p. ej. `/egresos?mes=2026-10&desde=…&hasta=…`):

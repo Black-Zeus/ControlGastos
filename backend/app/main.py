@@ -28,7 +28,7 @@ _openapi_url = "/api/openapi.json" if settings.debug else None
 
 app = FastAPI(
     title="ControlGastos API",
-    version="0.3.0",
+    version="0.4.0",
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,
