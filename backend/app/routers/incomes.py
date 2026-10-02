@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.transaction import Income, IncomePaymentStatus
 from app.models.period import Period, PeriodStatus
 from app.models.catalog import IncomeType
+from app.services.period_rules import assert_date_in_period
 
 router = APIRouter(prefix="/incomes", tags=["incomes"])
 
@@ -162,6 +163,7 @@ async def create_income(
     current_user: User = Depends(get_current_user),
 ):
     open_period = await _get_open_period(db, current_user.id)
+    assert_date_in_period(body.date, open_period)
 
     income_type = (await db.execute(
         select(IncomeType).where(
@@ -213,6 +215,11 @@ async def update_income(
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
 
     await _assert_income_editable(income, db)
+
+    if body.date is not None:
+        period = (await db.execute(select(Period).where(Period.id == income.period_id))).scalar_one_or_none() \
+            if income.period_id else None
+        assert_date_in_period(body.date, period or await _get_open_period(db, current_user.id))
 
     if body.income_type_id and body.income_type_id != income.income_type_id:
         income_type = (await db.execute(

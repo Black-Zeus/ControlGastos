@@ -30,6 +30,7 @@ from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
 from app.routers.expenses import _build_out as _build_expense_out, _assert_expense_editable, ExpenseOut
 from app.services.pdf_report import generate_pdf
+from app.services.period_rules import assert_date_in_period
 from app.services.pdf_shopping_list import EvidenceRow, build_shopping_list_evidence_html
 
 logger = logging.getLogger(__name__)
@@ -242,6 +243,8 @@ async def create_shopping_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if body.planned_date is not None:
+        assert_date_in_period(body.planned_date, await _get_open_period(db, current_user.id))
     shopping_list = ShoppingList(user_id=current_user.id, **body.model_dump())
     db.add(shopping_list)
     await db.commit()
@@ -275,6 +278,8 @@ async def update_shopping_list(
     for field, value in body.model_dump(exclude_none=True, exclude={"planned_date"}).items():
         setattr(shopping_list, field, value)
     if "planned_date" in body.model_fields_set:
+        if body.planned_date is not None:
+            assert_date_in_period(body.planned_date, await _get_open_period(db, current_user.id))
         shopping_list.planned_date = body.planned_date
     await db.commit()
     await db.refresh(shopping_list)
@@ -418,6 +423,7 @@ async def send_to_expense(
     el mes (p. ej. la feria de cada semana) y nunca modifica uno ya registrado. Los ítems
     enviados quedan con sent_at; reiniciar la lista (POST /{list_id}/reset) lo limpia."""
     open_period = await _get_open_period(db, current_user.id)
+    assert_date_in_period(body.date, open_period)
     shopping_list = await _get_list_or_404(list_id, current_user.id, db)
     items = await _load_items(db, list_id)
 

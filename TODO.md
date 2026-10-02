@@ -38,8 +38,7 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
 
 `DataTable` acepta `RowAction.primary`: si alguna acción lo marca, solo las primarias quedan como
 botón y el resto va a un menú "⋯" (Radix `DropdownMenu`). En Egresos quedan visibles **Editar** y
-**Pasar a saldado**, y **Confirmar borrador** solo en filas en borrador. Pendiente evaluar el mismo
-patrón en otras tablas con muchas acciones.
+**Pasar a saldado**, y **Confirmar borrador** solo en filas en borrador.
 
 ### ~~Rango de fechas y disponible por compromisos~~ — hecho
 
@@ -48,20 +47,19 @@ tabla y los KPIs. La tarjeta **Disponible** calcula ingresos del período − ya
 pendiente en la vista (rango + filtros). La tabla ordena por fecha ascendente por defecto.
 Posible extensión: el mismo selector en Ingresos.
 
-### Selección múltiple y acciones masivas
+### ~~Selección múltiple y acciones masivas~~ — hecho
 
-Permitir marcar varios egresos (checkbox por fila + "seleccionar todos" sobre lo filtrado) y
-aplicar una acción en bloque. Caso principal: **confirmar todos los borradores** de una vez
-(egresos en borrador que vienen de la ingesta/OCR). Otras candidatas: marcar como saldado o
-pendiente y eliminar.
+`DataTable` admite selección (`selectable`/`selectedKeys`/`onSelectionChange`; "seleccionar todo"
+abarca lo filtrado en todas las páginas). En Egresos, al seleccionar aparece una barra con
+**Confirmar borradores**, **Pasar a pagado** y **Eliminar**, cada una con la cantidad de
+seleccionados a los que aplica (un borrador no pasa a pagado; sin monto no se confirma).
+`POST /expenses/bulk` valida cada egreso con las reglas individuales y devuelve los omitidos con
+su motivo. Al eliminar egresos (individual o masivo) también se borran sus archivos en MinIO.
 
-- Frontend: `DataTable` no soporta selección hoy; hay que agregarla sin romper las filas
-  expandibles (`isExpandable`/`renderExpanded`).
-- Backend: evaluar un endpoint bulk (p. ej. `POST /expenses/bulk` con `ids` + `action`) en vez de N
-  llamadas, respetando las reglas de período (solo egresos de un período abierto) y devolviendo el
-  resultado por ítem para informar cuáles fallaron.
-- Confirmar un borrador exige monto, categoría y fecha válidos: definir qué pasa con los que no los
-  tienen (omitirlos e informarlos, o bloquear la acción).
+### ~~Regla de período para todos los registros~~ — hecho
+
+Egresos, ingresos, recibos de ingesta, fecha de compra de listas y su envío solo aceptan fechas
+dentro del período abierto (`services/period_rules.py`, validado en backend; calendarios acotados).
 
 ---
 
@@ -128,8 +126,7 @@ vía migración Alembic) — no agregar una columna paralela.
    - Ítems y monto de esos egresos quedan bloqueados (`expenses.items_from_list`). Para
      corregirlos: **"Devolver a lista de compra"** (`POST /shopping-lists/from-expense/{id}`) crea
      una lista con los ítems comprados y elimina el egreso con su adjunto.
-   - Pendiente evaluar: el egreso enviado se registra en el período abierto aunque la fecha de
-     compra caiga en otro mes (mismo comportamiento que antes de esta función).
+   - La fecha de compra y la del envío deben estar dentro del período abierto (regla general).
 
 ### ~~Desglose manual en el formulario de egresos~~ — hecho
 
@@ -179,7 +176,9 @@ Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/Integrat
 
 ---
 
-## [PENDIENTE] App Mobile — React Native / Expo Lite
+## [POSTERIOR] App Mobile — React Native / Expo Lite
+
+> Hoja de ruta: fuera del alcance de las sesiones actuales; no se trabaja hasta nuevo aviso.
 
 ### Qué busca cubrir
 

@@ -8,6 +8,8 @@ Regla de períodos:
   - Si no existe período abierto, no se puede crear egresos.
 """
 import asyncio
+import enum
+import logging
 import uuid
 from datetime import datetime
 from datetime import date as date_cls
@@ -25,7 +27,10 @@ from app.models.transaction import Expense, Attachment, PaymentStatus, ReviewSta
 from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
 from app.models.merchant_memory import MerchantCategoryMemory
+from app.services.period_rules import assert_date_in_period, period_bounds
 from app.services.receipt_parsing import run_ocr, guess_amount, guess_category
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -97,6 +102,16 @@ def _items_snapshot(items: list[ExpenseItemIn]) -> tuple[list[dict], Decimal]:
     if any(not row["label"] for row in snapshot):
         raise HTTPException(status_code=400, detail="Cada ítem del desglose necesita una descripción")
     return snapshot, sum((i.amount for i in items), Decimal("0"))
+
+
+async def _period_of(period_id: Optional[uuid.UUID], db: AsyncSession, user_id: uuid.UUID) -> Period:
+    """Período del registro (abierto, porque solo se editan registros de un período abierto);
+    si no tiene, el período abierto actual."""
+    if period_id:
+        period = (await db.execute(select(Period).where(Period.id == period_id))).scalar_one_or_none()
+        if period:
+            return period
+    return await _get_open_period(db, user_id)
 
 
 async def _get_open_period(db: AsyncSession, user_id: uuid.UUID) -> Period:
@@ -226,8 +241,9 @@ async def create_expense(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Requiere período abierto
+    # Requiere período abierto, y la fecha debe caer dentro de él
     open_period = await _get_open_period(db, current_user.id)
+    assert_date_in_period(body.date, open_period)
 
     # Validar categoría
     cat = (await db.execute(
@@ -289,6 +305,9 @@ async def update_expense(
 
     await _assert_expense_editable(expense, db)
 
+    if body.date is not None:
+        assert_date_in_period(body.date, await _period_of(expense.period_id, db, current_user.id))
+
     if body.category_id and body.category_id != expense.category_id:
         cat = (await db.execute(
             select(Category).where(
@@ -339,8 +358,118 @@ async def delete_expense(
     if not expense:
         raise HTTPException(status_code=404, detail="Egreso no encontrado")
     await _assert_expense_editable(expense, db)
+    storage_keys = (await db.execute(
+        select(Attachment.storage_key).where(Attachment.expense_id == expense.id)
+    )).scalars().all()
     await db.delete(expense)
     await db.commit()
+    await _delete_stored_files(storage_keys)
+
+
+async def _delete_stored_files(keys: list[str]) -> None:
+    """Borra de MinIO los archivos de adjuntos ya eliminados de la base (best-effort):
+    sin esto quedaban huérfanos al eliminar un egreso."""
+    from app import storage
+    loop = asyncio.get_event_loop()
+    for key in keys:
+        try:
+            await loop.run_in_executor(None, storage.delete_object, key)
+        except Exception:
+            logger.warning("No se pudo borrar el archivo %s", key)
+
+
+# ─── Acciones masivas ─────────────────────────────────────────────────────────
+
+class BulkAction(str, enum.Enum):
+    confirm = "confirm"        # borrador → confirmado
+    mark_paid = "mark_paid"    # confirmado pendiente → saldado
+    delete = "delete"
+
+
+class BulkRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    action: BulkAction
+
+
+class BulkFailure(BaseModel):
+    id: uuid.UUID
+    reason: str
+
+
+class BulkResult(BaseModel):
+    action: BulkAction
+    done: list[uuid.UUID]
+    failed: list[BulkFailure]
+
+
+@router.post("/bulk", response_model=BulkResult)
+async def bulk_expenses(
+    body: BulkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Aplica una acción a varios egresos. Cada uno se valida con las mismas reglas que
+    la acción individual; los que no cumplen se omiten y se informan en `failed` con el
+    motivo, sin bloquear al resto."""
+    ids = list(dict.fromkeys(body.ids))
+    expenses = {
+        e.id: e for e in (await db.execute(
+            select(Expense).where(Expense.id.in_(ids), Expense.user_id == current_user.id)
+        )).scalars().all()
+    }
+    period_ids = {e.period_id for e in expenses.values() if e.period_id}
+    periods = {
+        p.id: p for p in (await db.execute(select(Period).where(Period.id.in_(period_ids)))).scalars().all()
+    } if period_ids else {}
+
+    done: list[uuid.UUID] = []
+    failed: list[BulkFailure] = []
+    to_delete: list[Expense] = []
+    for expense_id in ids:
+        expense = expenses.get(expense_id)
+        if not expense:
+            failed.append(BulkFailure(id=expense_id, reason="Egreso no encontrado"))
+            continue
+        period = periods.get(expense.period_id) if expense.period_id else None
+        if period and period.status == PeriodStatus.cerrado:
+            failed.append(BulkFailure(id=expense_id, reason="Su período está cerrado"))
+            continue
+
+        if body.action == BulkAction.confirm:
+            if expense.review_status != ReviewStatus.borrador:
+                failed.append(BulkFailure(id=expense_id, reason="No es un borrador"))
+                continue
+            if not expense.amount or expense.amount <= 0:
+                failed.append(BulkFailure(id=expense_id, reason="Sin monto: complétalo antes de confirmar"))
+                continue
+            if period:
+                first, last = period_bounds(period)
+                if not (first <= expense.date <= last):
+                    failed.append(BulkFailure(id=expense_id, reason="Fecha fuera del período abierto"))
+                    continue
+            expense.review_status = ReviewStatus.confirmado
+        elif body.action == BulkAction.mark_paid:
+            if expense.review_status == ReviewStatus.borrador:
+                failed.append(BulkFailure(id=expense_id, reason="Es un borrador: confírmalo primero"))
+                continue
+            if expense.payment_status == PaymentStatus.saldado:
+                failed.append(BulkFailure(id=expense_id, reason="Ya está pagado"))
+                continue
+            expense.payment_status = PaymentStatus.saldado
+        else:
+            to_delete.append(expense)
+        done.append(expense_id)
+
+    storage_keys: list[str] = []
+    if to_delete:
+        storage_keys = list((await db.execute(
+            select(Attachment.storage_key).where(Attachment.expense_id.in_([e.id for e in to_delete]))
+        )).scalars().all())
+        for expense in to_delete:
+            await db.delete(expense)
+    await db.commit()
+    await _delete_stored_files(storage_keys)
+    return BulkResult(action=body.action, done=done, failed=failed)
 
 
 # ─── OCR bajo demanda (formulario "Nuevo egreso") ─────────────────────────────

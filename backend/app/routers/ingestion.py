@@ -35,6 +35,7 @@ from app.models.catalog import Category
 from app.models.channel_link import UserChannelLink
 from app.routers.expenses import _build_out as _build_expense_out, _get_open_period, _assert_expense_editable
 from app.services.receipt_parsing import remember_merchant_category
+from app.services.period_rules import assert_date_in_period, clamp_to_period
 
 router = APIRouter(tags=["ingestion"])
 
@@ -245,7 +246,8 @@ async def ingest_receipt(
     expense = Expense(
         user_id=auth.user_id,
         period_id=open_period.id,
-        date=date_cls.today(),
+        # Hoy, acotado al período abierto (si este quedó atrás, se usa su último día).
+        date=clamp_to_period(date_cls.today(), open_period),
         label=note or "Recibo pendiente de revisión",
         category_id=otros.id,
         amount=0,
@@ -402,6 +404,7 @@ async def confirm_receipt(
             detail="No se pudo leer el monto automáticamente. Indícalo con /modificar monto:<valor>",
         )
     if body.date is not None:
+        assert_date_in_period(body.date, await _get_open_period(db, auth.user_id))
         expense.date = body.date
     if body.label is not None:
         expense.label = body.label
