@@ -25,6 +25,7 @@ from app.models.transaction import Expense, Attachment, PaymentStatus, ReviewSta
 from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
 from app.models.merchant_memory import MerchantCategoryMemory
+from app.services.period_rules import assert_date_in_period
 from app.services.receipt_parsing import run_ocr, guess_amount, guess_category
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -97,6 +98,16 @@ def _items_snapshot(items: list[ExpenseItemIn]) -> tuple[list[dict], Decimal]:
     if any(not row["label"] for row in snapshot):
         raise HTTPException(status_code=400, detail="Cada ítem del desglose necesita una descripción")
     return snapshot, sum((i.amount for i in items), Decimal("0"))
+
+
+async def _period_of(period_id: Optional[uuid.UUID], db: AsyncSession, user_id: uuid.UUID) -> Period:
+    """Período del registro (abierto, porque solo se editan registros de un período abierto);
+    si no tiene, el período abierto actual."""
+    if period_id:
+        period = (await db.execute(select(Period).where(Period.id == period_id))).scalar_one_or_none()
+        if period:
+            return period
+    return await _get_open_period(db, user_id)
 
 
 async def _get_open_period(db: AsyncSession, user_id: uuid.UUID) -> Period:
@@ -226,8 +237,9 @@ async def create_expense(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Requiere período abierto
+    # Requiere período abierto, y la fecha debe caer dentro de él
     open_period = await _get_open_period(db, current_user.id)
+    assert_date_in_period(body.date, open_period)
 
     # Validar categoría
     cat = (await db.execute(
@@ -288,6 +300,9 @@ async def update_expense(
         raise HTTPException(status_code=404, detail="Egreso no encontrado")
 
     await _assert_expense_editable(expense, db)
+
+    if body.date is not None:
+        assert_date_in_period(body.date, await _period_of(expense.period_id, db, current_user.id))
 
     if body.category_id and body.category_id != expense.category_id:
         cat = (await db.execute(

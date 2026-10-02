@@ -6,6 +6,7 @@ import { fmtMoney } from '@/components/ui/KpiCard'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { Modal } from '@/components/ui/Modal'
 import { toLocalISODate } from '@/lib/dateRange'
+import { useOpenPeriodBounds } from '@/hooks/useOpenPeriodBounds'
 
 /** Qué se hizo con la lista después de enviarla (para que la página que abrió el modal reaccione). */
 export type SendOutcome = 'reset' | 'deleted'
@@ -98,6 +99,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 }) {
   const [date, setDate] = useState(list.planned_date ?? toLocalISODate(new Date()))
   const [sent, setSent] = useState(false)
+  const periodBounds = useOpenPeriodBounds()
   const [categoryId, setCategoryId] = useState(list.default_category_id ?? '')
   const [label, setLabel] = useState(list.name)
   const [observation, setObservation] = useState('')
@@ -188,7 +190,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div>
           <label htmlFor="ste-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">Fecha</label>
-          <input id="ste-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className={cn(inputCls, 'w-full')} />
+          <input id="ste-date" type="date" value={date} min={periodBounds.min} max={periodBounds.max} onChange={e => setDate(e.target.value)} required className={cn(inputCls, 'w-full')} />
         </div>
 
         <div>

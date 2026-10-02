@@ -16,6 +16,7 @@ import { amountStepFor, parseAmountInput, fmtAmountInput, purchasedTotal } from 
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
+import { useOpenPeriodBounds } from '@/hooks/useOpenPeriodBounds'
 
 // ─── Badge de estado de envío ──────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ function EditListModal({ initialName, initialDate, onClose, onSubmit }: {
 }) {
   const [name, setName] = useState(initialName)
   const [plannedDate, setPlannedDate] = useState(initialDate ?? '')
+  const periodBounds = useOpenPeriodBounds()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -147,9 +149,9 @@ function EditListModal({ initialName, initialDate, onClose, onSubmit }: {
           <label htmlFor="rl-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
             Fecha de compra
           </label>
-          <input id="rl-date" type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} className={cn(inputCls, 'w-full')} />
+          <input id="rl-date" type="date" value={plannedDate} min={periodBounds.min} max={periodBounds.max} onChange={e => setPlannedDate(e.target.value)} className={cn(inputCls, 'w-full')} />
           <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
-            Fecha en que se imputa en Egresos y fecha sugerida al enviar. Vacía = hoy.
+            Dentro del período abierto. Se imputa en Egresos y es la fecha sugerida al enviar. Vacía = hoy.
           </p>
         </div>
         {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}

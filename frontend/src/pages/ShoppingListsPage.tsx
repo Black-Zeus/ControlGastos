@@ -14,6 +14,7 @@ import { KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
 import { fmtMoney } from '@/components/ui/KpiCard'
 import { purchasedTotal } from '@/lib/money'
+import { useOpenPeriodBounds } from '@/hooks/useOpenPeriodBounds'
 
 function Field({ label, id, placeholder, required, value, onChange }: {
   label: string; id: string; placeholder?: string
@@ -91,6 +92,7 @@ function CreateForm({ categories, onSubmit, onCancel }: {
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [plannedDate, setPlannedDate] = useState('')
+  const periodBounds = useOpenPeriodBounds()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -120,9 +122,9 @@ function CreateForm({ categories, onSubmit, onCancel }: {
         <label htmlFor="sl-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
           Fecha de compra <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
         </label>
-        <input id="sl-date" type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} className={selectCls} />
+        <input id="sl-date" type="date" value={plannedDate} min={periodBounds.min} max={periodBounds.max} onChange={e => setPlannedDate(e.target.value)} className={selectCls} />
         <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
-          Fecha en que se imputa la compra en Egresos (p. ej. el 24/12 para Navidad). Si la dejas vacía, se usa la de hoy.
+          Fecha en que se imputa la compra en Egresos; debe estar dentro del período abierto. Si la dejas vacía, se usa la de hoy.
         </p>
       </div>
       {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
