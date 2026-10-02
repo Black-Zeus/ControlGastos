@@ -17,6 +17,7 @@ from app.models.email_log import EmailLog
 from app.models.password_reset import PasswordResetToken, TokenType
 from app.models.shopping_list import ShoppingList, ShoppingListItem
 from app.models.merchant_memory import MerchantCategoryMemory
+from app.models.channel_link import Channel, UserChannelLink, ChannelLinkCode
 
 __all__ = [
     "Base",
@@ -32,4 +33,5 @@ __all__ = [
     "PasswordResetToken", "TokenType",
     "ShoppingList", "ShoppingListItem",
     "MerchantCategoryMemory",
+    "Channel", "UserChannelLink", "ChannelLinkCode",
 ]

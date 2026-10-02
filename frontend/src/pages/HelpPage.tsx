@@ -1,7 +1,7 @@
 import { useMemo, useState, type ElementType } from 'react'
 import {
-  ArrowRight, CalendarRange, ChevronDown, CircleHelp, FileText, Gauge, LayoutDashboard,
-  Search, Settings2, ShoppingCart, ShieldCheck, Wallet, Bell, Repeat2, UserRound,
+  CalendarRange, ChevronDown, CircleHelp, FileText, Gauge, LayoutDashboard,
+  Settings2, ShoppingCart, Wallet, Bell, Repeat2, UserRound, Plug, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +18,8 @@ import imgPerfil from '@/assets/help/perfil.png'
 import imgAboutModal from '@/assets/help/about-modal.png'
 import imgPerfilNotificaciones from '@/assets/help/perfil-notificaciones.png'
 import imgReportePdfPreview from '@/assets/help/reporte-pdf-preview.png'
+import imgVincularCanal from '@/assets/help/vincular-canal-modal.png'
+import imgResponsableObviable from '@/assets/help/responsable-obviable-form.png'
 
 type Guide = {
   id: string
@@ -153,6 +155,21 @@ const GUIDES: Guide[] = [
       'Activa o desactiva recordatorios y fija la hora de notificación.',
     ],
   },
+  {
+    id: 'integraciones',
+    title: '10. Vincular Telegram o WhatsApp',
+    summary: 'Permite registrar egresos enviando la foto de un recibo por chat, sin abrir la aplicación.',
+    image: imgVincularCanal,
+    chips: ['Integraciones', 'Opcional'],
+    steps: [
+      'Ve a Integraciones en el menú lateral.',
+      'Pulsa Vincular Telegram o Vincular WhatsApp, según el canal que quieras usar.',
+      'Copia el código de 8 caracteres que aparece — es válido por 10 minutos y de un solo uso.',
+      'Envía ese código como mensaje al bot desde tu WhatsApp o Telegram.',
+      'La ventana detecta el vínculo sola y se cierra — desde ese momento, cualquier foto de recibo que envíes por ese canal se registra como un egreso en borrador, pendiente de tu confirmación.',
+      'Puedes desvincular el canal en cualquier momento desde la misma pantalla.',
+    ],
+  },
 ]
 
 const FAQS: Faq[] = [
@@ -183,11 +200,13 @@ const FAQS: Faq[] = [
   {
     q: '¿Puedo asignar un responsable a cada movimiento?',
     a: 'Sí. Responsable es una etiqueta opcional que ayuda a filtrar y a entender quién administra o genera cada registro.',
+    image: imgResponsableObviable,
     module: 'Movimientos',
   },
   {
     q: '¿Qué significa marcar un egreso como obviable?',
     a: 'Sirve para identificar gastos que no quieres considerar en ciertos totales o resúmenes. Puedes activarlo al crear o editar un egreso.',
+    image: imgResponsableObviable,
     module: 'Movimientos',
   },
   {
@@ -195,6 +214,12 @@ const FAQS: Faq[] = [
     a: 'En el modal Acerca de ControlGastos, accesible desde el logo o el nombre de la aplicación en el menú lateral.',
     image: imgAboutModal,
     module: 'Sistema',
+  },
+  {
+    q: '¿Puedo registrar un egreso enviando una foto por WhatsApp o Telegram?',
+    a: 'Sí. En Integraciones vinculas el canal una sola vez con un código de un solo uso. Después, cada foto de recibo que envíes por ese chat se registra como egreso en borrador — revisa el monto y la categoría propuestos y confírmalo desde Egresos.',
+    image: imgVincularCanal,
+    module: 'Integraciones',
   },
 ]
 
@@ -224,17 +249,21 @@ function GuideBadge({ id }: { id: string }) {
     cierre: FileText,
     reportes: Gauge,
     perfil: UserRound,
+    integraciones: Plug,
   }
   const Icon = map[id] ?? CircleHelp
   return <Icon size={16} />
 }
 
-function GuideCard({ guide }: { guide: Guide }) {
+function GuideCard({ guide, open, onToggle }: { guide: Guide; open: boolean; onToggle: () => void }) {
   return (
     <article id={guide.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
-      <img src={guide.image} alt={guide.title} className="h-56 w-full border-b border-gray-100 object-cover dark:border-slate-800" />
-      <div className="space-y-4 p-6">
-        <div className="space-y-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 p-6 text-left"
+      >
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap gap-2">
             {guide.chips.map(chip => (
               <span key={chip} className="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
@@ -245,7 +274,17 @@ function GuideCard({ guide }: { guide: Guide }) {
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">{guide.title}</h3>
           <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{guide.summary}</p>
         </div>
-        <StepList steps={guide.steps} />
+        <ChevronDown size={18} className={cn('shrink-0 text-gray-400 transition-transform duration-300 dark:text-slate-500', open && 'rotate-180')} />
+      </button>
+
+      {/* Mismo truco grid-rows 0fr→1fr que en FAQ: anima a altura "auto" sin medir contenido */}
+      <div className={cn('grid transition-all duration-300 ease-in-out', open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')}>
+        <div className="overflow-hidden">
+          <img src={guide.image} alt={guide.title} className="h-56 w-full border-y border-gray-100 object-cover dark:border-slate-800" />
+          <div className="p-6">
+            <StepList steps={guide.steps} />
+          </div>
+        </div>
       </div>
     </article>
   )
@@ -267,184 +306,141 @@ function FaqItem({ faq }: { faq: Faq }) {
           </span>
           <span className="block text-sm font-medium text-gray-800 dark:text-slate-200">{faq.q}</span>
         </span>
-        <ChevronDown size={16} className={cn('mt-1 shrink-0 text-gray-400 transition-transform dark:text-slate-500', open && 'rotate-180')} />
+        <ChevronDown size={16} className={cn('mt-1 shrink-0 text-gray-400 transition-transform duration-300 dark:text-slate-500', open && 'rotate-180')} />
       </button>
 
-      {open && (
-        <div className="space-y-4 pb-5">
-          <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{faq.a}</p>
-          {faq.image && (
-            <img
-              src={faq.image}
-              alt={faq.q}
-              className="w-full rounded-2xl border border-gray-100 object-cover dark:border-slate-800"
-            />
-          )}
+      {/* Truco grid-rows 0fr→1fr: anima a altura "auto" sin JS ni medir el contenido */}
+      <div className={cn('grid transition-all duration-300 ease-in-out', open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')}>
+        <div className="overflow-hidden">
+          <div className="relative mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 pr-11 dark:border-slate-800 dark:bg-slate-950/40">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              title="Cerrar"
+              aria-label="Cerrar respuesta"
+              className="absolute right-3 top-3 rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+            >
+              <X size={14} />
+            </button>
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{faq.a}</p>
+              {faq.image && (
+                <img
+                  src={faq.image}
+                  alt={faq.q}
+                  className="w-full rounded-2xl border border-gray-100 object-cover dark:border-slate-800"
+                />
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </article>
   )
 }
 
 export function HelpPage() {
-  const [query, setQuery] = useState('')
+  const [openGuideId, setOpenGuideId] = useState<string | null>(null)
+  const [activeTag, setActiveTag] = useState<string | null>(null)
 
-  const normalizedQuery = query.trim().toLowerCase()
+  const allTags = useMemo(
+    () => Array.from(new Set(GUIDES.flatMap(guide => guide.chips))),
+    [],
+  )
 
-  const filteredGuides = useMemo(() => {
-    if (!normalizedQuery) return GUIDES
-    return GUIDES.filter(guide => (
-      guide.title.toLowerCase().includes(normalizedQuery) ||
-      guide.summary.toLowerCase().includes(normalizedQuery) ||
-      guide.steps.some(step => step.toLowerCase().includes(normalizedQuery))
-    ))
-  }, [normalizedQuery])
+  const filteredTopics = useMemo(() => {
+    if (!activeTag) return GUIDES
+    return GUIDES.filter(guide => guide.chips.includes(activeTag))
+  }, [activeTag])
 
-  const filteredFaqs = useMemo(() => {
-    if (!normalizedQuery) return FAQS
-    return FAQS.filter(faq => (
-      faq.q.toLowerCase().includes(normalizedQuery) ||
-      faq.a.toLowerCase().includes(normalizedQuery) ||
-      faq.module.toLowerCase().includes(normalizedQuery)
-    ))
-  }, [normalizedQuery])
+  function openGuide(id: string) {
+    setActiveTag(null)
+    setOpenGuideId(id)
+    // Espera al frame siguiente para que el acordeón ya esté expandido
+    // (altura final) antes de hacer scroll, si no el cálculo queda corto.
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
-  const navItems = [
-    { label: 'Abrir período', icon: CalendarRange, href: '#periodo' },
-    { label: 'Dashboard', icon: LayoutDashboard, href: '#dashboard' },
-    { label: 'Ingresos', icon: Wallet, href: '#ingresos' },
-    { label: 'Egresos', icon: ShoppingCart, href: '#egresos' },
-    { label: 'Catálogos', icon: Settings2, href: '#catalogos' },
-    { label: 'Listas', icon: Repeat2, href: '#listas' },
-    { label: 'Cierre', icon: FileText, href: '#cierre' },
-    { label: 'Reportes', icon: Gauge, href: '#reportes' },
-    { label: 'Perfil', icon: UserRound, href: '#perfil' },
-  ]
+  function toggleTag(tag: string) {
+    setOpenGuideId(null)
+    setActiveTag(prev => prev === tag ? null : tag)
+  }
+
+  // "Guías paso a paso" arranca vacía — solo muestra contenido cuando se
+  // eligió un tópico puntual o se filtró por etiqueta.
+  const stepGuides = useMemo(() => {
+    if (openGuideId) return GUIDES.filter(guide => guide.id === openGuideId)
+    if (activeTag) return GUIDES.filter(guide => guide.chips.includes(activeTag))
+    return []
+  }, [openGuideId, activeTag])
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
-        <div className="grid gap-0 lg:grid-cols-[1.5fr_0.9fr]">
-          <div className="space-y-5 p-6 sm:p-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
-              <CircleHelp size={14} />
-              Centro de ayuda
-            </div>
-            <div className="space-y-3">
-              <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 sm:text-4xl">
-                Guías operativas ordenadas por flujo real de trabajo
-              </h1>
-              <p className="max-w-3xl text-sm leading-7 text-gray-500 dark:text-slate-400">
-                Esta versión reorganiza la ayuda para enseñar primero lo que necesitas habilitar, luego lo que debes registrar,
-                y al final cómo cerrar, revisar y corregir. Las imágenes se mantienen como apoyo visual.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                <Search size={16} className="shrink-0 text-gray-400" />
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Buscar por módulo, acción o pregunta"
-                  className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-              </label>
-            </div>
-          </div>
-
-          <aside className="border-t border-gray-100 bg-gray-50 p-6 dark:border-slate-800 dark:bg-slate-950/40 lg:border-l lg:border-t-0">
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-slate-500">
-                  Ruta recomendada
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-slate-400">
-                  Sigue este orden para que la documentación respete el uso real del sistema.
-                </p>
-              </div>
-
-              <nav className="grid gap-2">
-                {navItems.map(item => {
-                  const Icon = item.icon
-                  return (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      className="flex items-center justify-between rounded-2xl border border-transparent bg-white px-3 py-2.5 text-sm text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/20"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Icon size={15} className="text-primary-500" />
-                        {item.label}
-                      </span>
-                      <ArrowRight size={14} className="text-gray-300" />
-                    </a>
-                  )
-                })}
-              </nav>
-            </div>
-          </aside>
+      <section className="space-y-5 rounded-3xl border border-gray-100 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+        <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+          <CircleHelp size={14} />
+          Centro de ayuda
+        </div>
+        <div className="space-y-3">
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-slate-100 sm:text-4xl">
+            Guías operativas ordenadas por flujo real de trabajo
+          </h1>
+          <p className="text-sm leading-7 text-gray-500 dark:text-slate-400">
+            Esta versión reorganiza la ayuda para enseñar primero lo que necesitas habilitar, luego lo que debes registrar,
+            y al final cómo cerrar, revisar y corregir. Las imágenes se mantienen como apoyo visual.
+          </p>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
-                Orden sugerido
-              </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                Se priorizan dependencias antes de enseñar movimientos.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {GUIDES.map(guide => (
-                <a
-                  key={guide.id}
-                  href={`#${guide.id}`}
-                  className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-soft transition-colors hover:border-primary-200 hover:bg-primary-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/20"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
-                    <GuideBadge id={guide.id} />
-                  </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</p>
-                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{guide.summary}</p>
-                </div>
-                <ArrowRight size={16} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5" />
-              </a>
-            ))}
-          </div>
+      <section className="space-y-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            Tópicos
+          </h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+            Cada bloque explica qué hacer, cómo hacerlo y qué orden seguir. Pulsa uno para abrirlo abajo.
+          </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-gray-100 px-6 py-4 dark:border-slate-800">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">
-              Tópicos
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-              Cada bloque explica qué hacer, cómo hacerlo y qué orden seguir.
-            </p>
-          </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-2">
-            {GUIDES.map(guide => (
-              <div key={guide.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
-                    <ShieldCheck size={16} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400">{guide.chips.join(' · ')}</p>
-                  </div>
+        <div className="flex flex-wrap gap-2">
+          {allTags.map(tag => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className={cn(
+                'inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                activeTag === tag
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/50',
+              )}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredTopics.map(guide => (
+            <button
+              key={guide.id}
+              type="button"
+              onClick={() => openGuide(guide.id)}
+              className="rounded-2xl border border-gray-100 bg-gray-50 p-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50 dark:border-slate-800 dark:bg-slate-950/30 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/20"
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                  <GuideBadge id={guide.id} />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{guide.title}</p>
+                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{guide.chips.join(' · ')}</p>
                 </div>
-                <p className="text-sm leading-relaxed text-gray-500 dark:text-slate-400">{guide.summary}</p>
               </div>
-            ))}
-          </div>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -459,11 +455,18 @@ export function HelpPage() {
         </div>
 
         <div className="grid gap-6">
-          {filteredGuides.length > 0 ? (
-            filteredGuides.map(guide => <GuideCard key={guide.id} guide={guide} />)
+          {stepGuides.length > 0 ? (
+            stepGuides.map(guide => (
+              <GuideCard
+                key={guide.id}
+                guide={guide}
+                open={openGuideId === guide.id}
+                onToggle={() => setOpenGuideId(prev => prev === guide.id ? null : guide.id)}
+              />
+            ))
           ) : (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-500 shadow-soft dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              No hay resultados para la búsqueda actual.
+              Selecciona un tópico o una etiqueta arriba para ver su guía paso a paso.
             </div>
           )}
         </div>
@@ -480,13 +483,7 @@ export function HelpPage() {
             </p>
           </div>
           <div className="px-6">
-            {filteredFaqs.length > 0 ? (
-              filteredFaqs.map(faq => <FaqItem key={faq.q} faq={faq} />)
-            ) : (
-              <div className="py-8 text-center text-sm text-gray-500 dark:text-slate-400">
-                No hay preguntas que coincidan con tu búsqueda.
-              </div>
-            )}
+            {FAQS.map(faq => <FaqItem key={faq.q} faq={faq} />)}
           </div>
         </div>
 
@@ -502,6 +499,7 @@ export function HelpPage() {
                 'Cerrar o reabrir períodos.',
                 'Revisar reportes.',
                 'Ajustar perfil, avatar, contraseña y recordatorios.',
+                'Vincular Telegram o WhatsApp si quieres registrar egresos por chat.',
               ].map((item, index) => (
                 <div key={item} className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-3 dark:bg-slate-950/30">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-50 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">

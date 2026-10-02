@@ -140,6 +140,35 @@ El modelo de lista de compras en SQLite se diseña para convertirse en un egreso
 
 ---
 
+## [EN PROGRESO] Integraciones — vinculación de canales (Telegram/WhatsApp vía n8n)
+
+Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/IntegrationsPage.tsx`
+(migración `315c19dda564`). **Aún no desplegado en producción.**
+
+### ~~Autenticar a n8n en la ingesta por canal~~ — resuelto
+
+`POST /channels/link` y la ingesta por canal (`X-Channel` + `X-Channel-Id`) exigen el header
+`X-Integration-Key`, validado con `secrets.compare_digest` contra la variable `INTEGRATION_KEY`
+(ver `app/auth/integration.py`). Si la variable está vacía, esas rutas responden 503. El esquema
+`Bearer <ingestion_token>` no cambia.
+
+### Para desplegar
+
+- Generar la clave (`openssl rand -hex 32`) y ponerla en `.env.prd` del CT108 como
+  `INTEGRATION_KEY=...`; la misma clave va en las credenciales de n8n.
+- En los flujos de n8n, enviar `X-Integration-Key` en `POST /channels/link` y en todas las
+  llamadas a `/ingestion/*` que usen `X-Channel`/`X-Channel-Id`.
+- Opcional (defensa en profundidad): restringir esas rutas en nginx a la IP o red de n8n.
+
+### Otros pendientes
+
+- Lint del frontend: `npm run lint` no corre porque `eslint` no está en las dependencias (los
+  tipos sí se verificaron con `tsc -b`).
+- Probar end-to-end con n8n real en dev. Contra la API ya se probó con curl: código →
+  `POST /channels/link` → recibo con headers de canal (401 sin clave o con clave errónea).
+
+---
+
 ## [PENDIENTE] App Mobile — React Native / Expo Lite
 
 ### Qué busca cubrir

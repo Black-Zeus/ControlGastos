@@ -9,6 +9,7 @@ from app.seed import seed_system_catalogs
 from app.routers import auth, admin, catalog, ingestion
 from app.routers import expenses, incomes, periods, attachments, profile, recovery, reports
 from app.routers import shopping_lists
+from app.routers import channels
 
 settings = get_settings()
 
@@ -69,6 +70,7 @@ app.include_router(profile.router,    prefix=PREFIX)
 app.include_router(recovery.router,   prefix=PREFIX)
 app.include_router(reports.router,    prefix=PREFIX)
 app.include_router(shopping_lists.router, prefix=PREFIX)
+app.include_router(channels.router, prefix=PREFIX)
 
 
 @app.get("/api/health")
