@@ -1,19 +1,22 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw, ShoppingCart,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   userApi, authToken,
   type Expense, type AttachmentOut, type ShoppingList,
-  type ExpenseCreatePayload, type ExpenseUpdatePayload,
-  type UserCategory, type Period, type OcrPreview,
+  type ExpenseCreatePayload, type ExpenseUpdatePayload, type ExpenseItem,
+  type UserCategory, type Period, type OcrPreview, type Income,
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter'
+import { EMPTY_RANGE, isInRange, isRangeActive, toLocalISODate, type DateRange } from '@/lib/dateRange'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
@@ -179,9 +182,15 @@ interface AttachmentPanelProps {
   // Solo dispara en el flujo de creación (sin expenseId todavía) — intenta
   // leer monto/categoría de la imagen para proponerlos en el formulario.
   onNewPendingFile?: (file: File) => void
+  /** El adjunto actual es el PDF de evidencia de una lista de compra: se pide confirmación antes de perderlo. */
+  isListEvidence?: boolean
 }
 
-function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded, onNewPendingFile }: AttachmentPanelProps) {
+const LIST_EVIDENCE_WARNING =
+  'Este adjunto es el PDF de evidencia de la lista de compra. Cada egreso admite un solo adjunto, ' +
+  'así que se perderá. ¿Continuar?'
+
+function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUploaded, onNewPendingFile, isListEvidence }: AttachmentPanelProps) {
   const [uploaded, setUploaded] = useState<AttachmentOut | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -208,6 +217,8 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
       .then(b => { url = URL.createObjectURL(b); setThumbUrl(url) })
       .catch(() => {})
     return () => { if (url) URL.revokeObjectURL(url) }
+    // Depende del id del adjunto, no del objeto: evita re-descargar la miniatura en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploaded?.id, expenseId])
 
   function pickFile(rawFile: File | null) {
@@ -228,7 +239,16 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
     }
   }
 
+  // El PDF de evidencia solo se protege mientras es el adjunto original (generado al enviar la lista).
+  const guardsEvidence = !!isListEvidence && uploaded?.mime_type === 'application/pdf' && uploaded.original_filename.startsWith('lista-')
+
+  function replaceFile() {
+    if (guardsEvidence && !window.confirm(LIST_EVIDENCE_WARNING)) return
+    inputRef.current?.click()
+  }
+
   async function removeFile() {
+    if (guardsEvidence && !window.confirm(LIST_EVIDENCE_WARNING)) return
     if (expenseId && uploaded) {
       try {
         await userApi.attachments.delete(expenseId, uploaded.id)
@@ -284,7 +304,7 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
             </div>
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={replaceFile}
               className="shrink-0 rounded-lg border border-gray-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >
               Reemplazar
@@ -556,7 +576,7 @@ function ShoppingListPreviewModal({ listId, currency, onClose }: {
 // ─── Formulario de egreso ─────────────────────────────────────────────────────
 
 interface ExpenseFormProps {
-  initial?: Partial<ExpenseCreatePayload & { review_status: string }>
+  initial?: Partial<ExpenseCreatePayload & { review_status: string; items_from_list: boolean }>
   expenseId?: string
   categories: UserCategory[]
   openPeriod: Period | null
@@ -582,7 +602,7 @@ function periodDateRange(p: Period | null) {
 }
 
 function ExpenseForm({
-  initial, expenseId, categories, openPeriod, amountStep = '0.01', currency: _currency,
+  initial, expenseId, categories, openPeriod, amountStep = '0.01', currency,
   defaultResponsible = '',
   onSubmit, onCancel, submitLabel, onPreviewAttachment,
   shoppingListId, onViewShoppingList,
@@ -597,6 +617,13 @@ function ExpenseForm({
   const [payment, setPayment]       = useState<'pendiente'|'saldado'>(initial?.payment_status ?? 'pendiente')
   const [responsible, setResponsible] = useState(initial?.responsible_tag ?? defaultResponsible)
   const [pending, setPending]       = useState<PendingFile | null>(null)
+  // Desglose manual (no aplica a egresos de lista de compra: su desglose es el snapshot de la lista)
+  // Ítems de lista de compra: congelados (ni desglose manual ni cambio de monto), aunque la lista ya no exista.
+  const itemsLocked = !!initial?.items_from_list
+  const canBreakdown = !shoppingListId && !itemsLocked
+  const [items, setItems] = useState<ExpenseItem[]>(
+    () => (initial?.items ?? []).map(i => ({ label: i.label, amount: fmtAmountInput(i.amount, amountStep) })),
+  )
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [ocrAnalyzing, setOcrAnalyzing] = useState(false)
@@ -663,13 +690,25 @@ function ExpenseForm({
     }
   }
 
+  /** Normaliza lo tecleado en un campo de monto; null si el texto no es un monto válido. */
+  function sanitizeAmount(raw: string): string | null {
+    const v = raw.replace(',', '.')
+    return (amountStep === '1' ? /^\d*$/ : /^\d*\.?\d*$/).test(v) ? v : null
+  }
+
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value.replace(',', '.')
-    if (amountStep === '1') {
-      if (/^\d*$/.test(v)) setAmount(v)
-    } else {
-      if (/^\d*\.?\d*$/.test(v)) setAmount(v)
-    }
+    const v = sanitizeAmount(e.target.value)
+    if (v !== null) setAmount(v)
+  }
+
+  const hasItems = canBreakdown && items.length > 0
+  // Con desglose (manual o de lista) el total siempre es la suma de los ítems.
+  const amountLocked = hasItems || (itemsLocked && (initial?.items?.length ?? 0) > 0)
+  const itemsTotal = items.reduce((sum, i) => sum + (Number(parseAmountInput(i.amount, amountStep)) || 0), 0)
+  const itemsTotalStr = amountStep === '1' ? String(Math.round(itemsTotal)) : itemsTotal.toFixed(2)
+
+  function updateItem(index: number, patch: Partial<ExpenseItem>) {
+    setItems(prev => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -681,12 +720,22 @@ function ExpenseForm({
     setSaving(true)
     try {
       if (responsible.trim()) addResponsibleTag(responsible)
+      const cleanItems = items.map(i => ({ label: i.label.trim(), amount: parseAmountInput(i.amount, amountStep) }))
+      if (hasItems && cleanItems.some(i => !i.label || !(Number(i.amount) > 0))) {
+        setError('Cada ítem del desglose necesita descripción y un monto mayor a 0')
+        return
+      }
+      // Sin ítems: se envía [] solo si antes había desglose (para quitarlo); si no, no se toca.
+      const itemsPayload = !canBreakdown ? undefined
+        : hasItems ? cleanItems
+        : (initial?.items?.length ? [] : undefined)
       await onSubmit(
         {
           date, label, category_id: categoryId,
-          amount: parseAmountInput(amount, amountStep) || '0',
+          amount: hasItems ? itemsTotalStr : (parseAmountInput(amount, amountStep) || '0'),
           obviable, payment_status: payment,
           responsible_tag: responsible || null,
+          items: itemsPayload,
         },
         pending?.file ?? null,
       )
@@ -738,16 +787,85 @@ function ExpenseForm({
               <input
                 type="text"
                 inputMode={amountStep === '1' ? 'numeric' : 'decimal'}
-                value={amount}
+                value={hasItems ? fmtAmountInput(itemsTotalStr, amountStep) : amount}
                 onChange={handleAmountChange}
-                onFocus={e => setAmount(parseAmountInput(e.currentTarget.value, amountStep))}
-                onBlur={e => setAmount(fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep))}
+                onFocus={e => { if (!amountLocked) setAmount(parseAmountInput(e.currentTarget.value, amountStep)) }}
+                onBlur={e => { if (!amountLocked) setAmount(fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep)) }}
+                readOnly={amountLocked}
+                title={itemsLocked ? 'Calculado desde la lista de compra' : hasItems ? 'Calculado como la suma de los ítems del desglose' : undefined}
                 required
                 placeholder={amountStep === '1' ? '0' : '0.00'}
-                className={inputCls}
+                className={cn(inputCls, amountLocked && 'cursor-not-allowed bg-gray-50 dark:bg-slate-900')}
               />
             </div>
           </FormGrid>
+
+          {/* Desglose en ítems (egreso compuesto) */}
+          {canBreakdown && (
+            <div className="rounded-xl border border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setItems(prev => (prev.length ? prev : [{ label: '', amount: '' }]))}
+                aria-expanded={hasItems}
+                className={cn(
+                  'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium',
+                  hasItems ? 'text-gray-700 dark:text-slate-300' : 'text-primary-600 hover:bg-gray-50 dark:text-primary-400 dark:hover:bg-slate-800/50',
+                )}
+              >
+                <span className="flex items-center gap-2"><ListTree size={14} /> Desglosar en ítems</span>
+                {hasItems && <span className="text-xs font-normal text-gray-400 dark:text-slate-500">{items.length} {items.length === 1 ? 'ítem' : 'ítems'}</span>}
+              </button>
+
+              {hasItems && (
+                <div className="space-y-2 border-t border-gray-100 px-3 pb-3 pt-3 dark:border-slate-800">
+                  {items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={it.label}
+                        onChange={e => updateItem(i, { label: e.target.value })}
+                        placeholder="Descripción"
+                        aria-label={`Descripción del ítem ${i + 1}`}
+                        maxLength={200}
+                        className={cn(inputCls, 'min-w-0 flex-1 px-3 py-2')}
+                      />
+                      <input
+                        type="text"
+                        inputMode={amountStep === '1' ? 'numeric' : 'decimal'}
+                        value={it.amount}
+                        onChange={e => { const v = sanitizeAmount(e.target.value); if (v !== null) updateItem(i, { amount: v }) }}
+                        onFocus={e => updateItem(i, { amount: parseAmountInput(e.currentTarget.value, amountStep) })}
+                        onBlur={e => updateItem(i, { amount: fmtAmountInput(parseAmountInput(e.currentTarget.value, amountStep), amountStep) })}
+                        placeholder={amountStep === '1' ? '0' : '0.00'}
+                        aria-label={`Monto del ítem ${i + 1}`}
+                        className={cn(inputCls, 'w-28 shrink-0 px-3 py-2 text-right tabular-nums sm:w-32')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}
+                        title="Quitar ítem"
+                        aria-label={`Quitar ítem ${i + 1}`}
+                        className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setItems(prev => [...prev, { label: '', amount: '' }])}
+                      className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    >
+                      <Plus size={13} /> Agregar ítem
+                    </button>
+                    <span className="text-sm text-gray-500 dark:text-slate-400">
+                      Total <span className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(itemsTotal, currency)}</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Categoría */}
           <div>
@@ -904,6 +1022,7 @@ function ExpenseForm({
             onPendingChange={setPending}
             onPreviewUploaded={onPreviewAttachment ?? (() => {})}
             onNewPendingFile={handleOcrAttach}
+            isListEvidence={itemsLocked}
           />
         </div>
       </div>
@@ -940,7 +1059,7 @@ function ExpenseForm({
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
           <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
             El formulario ya tiene datos cargados. La imagen sugiere{' '}
-            {ocrProposal.amount && <>monto <span className="font-semibold text-gray-900 dark:text-slate-100">{fmtMoney(Number(ocrProposal.amount), _currency)}</span></>}
+            {ocrProposal.amount && <>monto <span className="font-semibold text-gray-900 dark:text-slate-100">{fmtMoney(Number(ocrProposal.amount), currency)}</span></>}
             {ocrProposal.amount && ocrProposal.category_name && ' y '}
             {ocrProposal.category_name && <>categoría <span className="font-semibold text-gray-900 dark:text-slate-100">{ocrProposal.category_name}</span></>}
             . ¿Quieres reemplazar lo que ya ingresaste?
@@ -975,11 +1094,58 @@ type ModalState =
   | { type: 'confirm-draft'; expense: Expense }
   | { type: 'attachments'; expense: Expense; att?: AttachmentOut }
   | { type: 'shopping-list-preview'; listId: string }
+  | { type: 'to-list'; expense: Expense }
   | null
 
 type Filters = Record<string, string | string[]>
 
+// ─── Borradores de listas de compra ───────────────────────────────────────────
+// Una lista activa con productos comprados sin enviar se muestra en Egresos como
+// fila de solo lectura: no existe en la base (se calcula aquí), no suma en los KPIs
+// (es borrador) y desaparece sola al enviarla, porque esos ítems dejan de estar
+// pendientes. Su fecha es la "fecha de compra" de la lista, o hoy si no tiene.
+
+const LIST_DRAFT_PREFIX = 'lista-'
+
+function isListDraft(e: Expense): boolean {
+  return e.id.startsWith(LIST_DRAFT_PREFIX)
+}
+
+function buildListDrafts(lists: ShoppingList[], categories: UserCategory[], periodId: string | null): Expense[] {
+  const today = toLocalISODate(new Date())
+  return lists
+    .filter(l => !l.archived && Number(l.pending_send_amount) > 0)
+    .map(l => {
+      const cat = categories.find(c => c.id === l.default_category_id)
+      const pendingIds = new Set(l.pending_send_item_ids)
+      return {
+        id: `${LIST_DRAFT_PREFIX}${l.id}`,
+        period_id: periodId,
+        date: l.planned_date ?? today,
+        label: `Lista compra [Borrador] - ${l.name}`,
+        amount: l.pending_send_amount,
+        category_id: l.default_category_id ?? '',
+        category_name: cat?.name ?? 'Sin categoría',
+        category_type: cat?.type ?? '',
+        obviable: false,
+        payment_status: 'pendiente',
+        review_status: 'borrador',
+        source: 'web',
+        observation: null,
+        responsible_tag: null,
+        created_at: l.updated_at,
+        attachment_count: 0,
+        shopping_list_id: l.id,
+        items_from_list: true,
+        items: l.items
+          .filter(i => pendingIds.has(i.id))
+          .map(i => ({ label: i.label, amount: String(Number(i.quantity) * Number(i.unit_price ?? 0)) })),
+      } satisfies Expense
+    })
+}
+
 export function ExpensesPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const currency  = user?.currency ?? 'CRC'
   const userName  = user?.name ?? ''
@@ -989,6 +1155,9 @@ export function ExpensesPage() {
   const [ready, setReady] = useState(false)
 
   const [expenses, setExpenses]     = useState<Expense[]>([])
+  const [incomes, setIncomes]       = useState<Income[]>([])
+  const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([])
+  const [range, setRange]           = useState<DateRange>(EMPTY_RANGE)
   const [categories, setCategories] = useState<UserCategory[]>([])
   const [allPeriods, setAllPeriods] = useState<Period[]>([])
   const [period, setPeriod]         = useState<Period | null>(null)
@@ -1011,12 +1180,16 @@ export function ExpensesPage() {
     if (!ready || year === null || month === null) return
     setLoading(true)
     try {
-      const [exps, cats, periods] = await Promise.all([
+      const [exps, incs, lists, cats, periods] = await Promise.all([
         userApi.expenses.list(year, month),
+        userApi.incomes.list(year, month),
+        userApi.shoppingLists.list(false),
         userApi.categories.list(),
         userApi.periods.list(),
       ])
       setExpenses(exps)
+      setIncomes(incs)
+      setShoppingLists(lists)
       setCategories(cats)
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
@@ -1034,9 +1207,11 @@ export function ExpensesPage() {
   const isOpenPeriod = period?.status === 'abierto'
   const periodClosed = period?.status === 'cerrado'
 
-  function prevPeriod() { if (canGoPrev) { const p = allPeriods[periodIdx + 1]; setYear(p.year); setMonth(p.month) } }
-  function nextPeriod() { if (canGoNext) { const p = allPeriods[periodIdx - 1]; setYear(p.year); setMonth(p.month) } }
-  function jumpToOpenPeriod() { if (openPeriod) { setYear(openPeriod.year); setMonth(openPeriod.month) } }
+  // El rango de fechas es relativo al período visible: se limpia al cambiar de período.
+  function goToPeriod(p: { year: number; month: number }) { setYear(p.year); setMonth(p.month); setRange(EMPTY_RANGE) }
+  function prevPeriod() { if (canGoPrev) goToPeriod(allPeriods[periodIdx + 1]) }
+  function nextPeriod() { if (canGoNext) goToPeriod(allPeriods[periodIdx - 1]) }
+  function jumpToOpenPeriod() { if (openPeriod) goToPeriod(openPeriod) }
 
   const catOptions = useMemo(() =>
     categories.filter(c => c.active).map(c => ({ value: c.id, label: c.name })),
@@ -1066,7 +1241,13 @@ export function ExpensesPage() {
     },
   ]
 
-  const filtered = useMemo(() => expenses.filter(e => {
+  const listDrafts = useMemo(() => {
+    if (year === null || month === null) return []
+    const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`
+    return buildListDrafts(shoppingLists, categories, period?.id ?? null).filter(d => d.date.startsWith(monthPrefix))
+  }, [shoppingLists, categories, period, year, month])
+
+  const filtered = useMemo(() => [...expenses, ...listDrafts].filter(e => {
     const s = (filters.search as string).toLowerCase()
     if (s && !e.label.toLowerCase().includes(s)) return false
     if (filters.category    && e.category_id !== filters.category) return false
@@ -1075,14 +1256,16 @@ export function ExpensesPage() {
     if (filters.obviable === 'si' && !e.obviable) return false
     if (filters.obviable === 'no' && e.obviable)  return false
     if (filters.payment  && e.payment_status !== filters.payment)  return false
+    if (!isInRange(e.date, range)) return false
     return true
-  }), [expenses, filters])
+  }), [expenses, listDrafts, filters, range])
 
   // La tabla sigue mostrando los borradores (con su badge) para que el usuario
   // los revise, pero un borrador sin confirmar no cuenta en estos resúmenes —
   // mismo criterio que dashboard/reportes/cierre de período.
   const confirmed       = useMemo(() => filtered.filter(e => e.review_status !== 'borrador'), [filtered])
-  const draftCount      = filtered.length - confirmed.length
+  const draftCount      = filtered.filter(e => e.review_status === 'borrador' && !isListDraft(e)).length
+  const listasEnCurso   = filtered.filter(isListDraft).reduce((s, e) => s + Number(e.amount), 0)
 
   const total          = confirmed.reduce((s, e) => s + Number(e.amount), 0)
   const pendingCount   = confirmed.filter(e => e.payment_status === 'pendiente').length
@@ -1091,6 +1274,28 @@ export function ExpensesPage() {
   const montoPendiente = confirmed.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + Number(e.amount), 0)
   const montoSaldado   = confirmed.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + Number(e.amount), 0)
   const obviableTotal  = confirmed.filter(e => e.obviable).reduce((s, e) => s + Number(e.amount), 0)
+
+  // Disponible = ingresos del período − todo lo ya pagado en el período − lo pendiente
+  // en la vista actual (rango + filtros). Responde "¿cuánto me queda si pago solo lo
+  // comprometido en estas fechas?". Ingresos con el mismo criterio que el Dashboard.
+  const ingresosPeriodo = incomes.reduce((s, i) => s + Number(i.amount), 0)
+  const pagadoPeriodo   = expenses
+    .filter(e => e.review_status !== 'borrador' && e.payment_status === 'saldado')
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const disponible      = ingresosPeriodo - pagadoPeriodo - montoPendiente - listasEnCurso
+  const periodBounds    = month !== null && year !== null
+    ? { min: `${year}-${String(month).padStart(2, '0')}-01`, max: `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}` }
+    : { min: undefined, max: undefined }
+  const rangeExceedsPeriod = isRangeActive(range) && !!periodBounds.min &&
+    ((!!range.from && range.from < periodBounds.min) || (!!range.to && range.to > periodBounds.max!))
+
+  async function handleToList(expense: Expense) {
+    try {
+      const list = await userApi.shoppingLists.fromExpense(expense.id)
+      setModal(null)
+      navigate(`/listas-compra/${list.id}`, { state: { from: '/egresos' } })
+    } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
+  }
 
   async function togglePayment(expense: Expense) {
     const next: 'pendiente' | 'saldado' = expense.payment_status === 'pendiente' ? 'saldado' : 'pendiente'
@@ -1117,8 +1322,16 @@ export function ExpensesPage() {
       key: 'label', label: 'Descripción', sortable: true,
       render: e => (
         <div className="flex items-center gap-2">
-          <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
-          {e.review_status === 'borrador' && <DraftBadge />}
+          {isListDraft(e) ? (
+            <p className="flex items-center gap-1.5 font-medium italic text-gray-500 dark:text-slate-400">
+              <ShoppingCart size={13} className="shrink-0" /> {e.label}
+            </p>
+          ) : (
+            <>
+              <p className="font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
+              {e.review_status === 'borrador' && <DraftBadge />}
+            </>
+          )}
         </div>
       ),
     },
@@ -1180,11 +1393,14 @@ export function ExpensesPage() {
     } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
-  const actions: RowAction<Expense>[] = [
+  const expenseActions: RowAction<Expense>[] = [
     {
       icon:     Check,
       label:    'Confirmar borrador',
-      disabled: e => e.review_status !== 'borrador' || !!periodClosed,
+      // Botón visible solo en filas en borrador; en el resto no aplica.
+      primary:  true,
+      hidden:   e => e.review_status !== 'borrador',
+      disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'confirm-draft', expense }),
     },
     {
@@ -1220,11 +1436,28 @@ export function ExpensesPage() {
       onClick:  e => setModal({ type: 'shopping-list-preview', listId: e.shopping_list_id! }),
     },
     {
+      icon:     Undo2,
+      label:    'Devolver a lista de compra',
+      hidden:   e => !e.items?.length,
+      disabled: () => !!periodClosed,
+      onClick:  e => setModal({ type: 'to-list', expense: e }),
+    },
+    {
       icon: Trash2, label: 'Eliminar', variant: 'danger',
       disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'delete', expense }),
     },
   ]
+  // Un borrador de lista no se edita desde Egresos: su única acción lleva a la lista de compra.
+  const actions: RowAction<Expense>[] = [
+    {
+      icon: Pencil, label: 'Editar lista', primary: true,
+      hidden: e => !isListDraft(e),
+      onClick: e => navigate(`/listas-compra/${e.shopping_list_id}`, { state: { from: '/egresos' } }),
+    },
+    ...expenseActions.map(a => ({ ...a, hidden: (e: Expense) => isListDraft(e) || !!a.hidden?.(e) })),
+  ]
+
 
   if (!ready || year === null || month === null) {
     return (
@@ -1272,13 +1505,69 @@ export function ExpensesPage() {
         </div>
       </div>
 
+      {/* Rango de fechas — filtra tabla y KPIs */}
+      <DateRangeFilter value={range} onChange={setRange} min={periodBounds.min} max={periodBounds.max} />
+      {rangeExceedsPeriod && (
+        <p className="-mt-2 text-xs text-gray-400 dark:text-slate-500">
+          El rango sale del período: solo se consideran los egresos de {MONTHS[month - 1]} {year}.
+        </p>
+      )}
+
       {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
       <KpiGrid cols={4}>
-        <KpiCard label="Total período"   amount={total}          currency={currency} count={confirmed.length} />
+        <KpiCard label={isRangeActive(range) ? 'Total en el rango' : 'Total período'} amount={total} currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
         <KpiCard label="Monto obviable"  amount={obviableTotal}  currency={currency} count={obviableCount}   color="text-primary-600 dark:text-primary-400" />
       </KpiGrid>
+
+      {/* Disponible pagando solo lo comprometido en la vista */}
+      <div className="rounded-2xl bg-white p-4 shadow-soft dark:bg-slate-900 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-slate-400">
+              <Wallet size={13} />
+              {isRangeActive(range)
+                ? `Disponible pagando lo pendiente ${range.from ? `del ${fmtDate(range.from)}` : ''} ${range.to ? `al ${fmtDate(range.to)}` : ''}`.replace(/\s+/g, ' ')
+                : 'Disponible pagando todo lo pendiente del período'}
+            </p>
+            <p className={cn(
+              'mt-1 break-words text-[clamp(1.25rem,6vw,1.5rem)] font-semibold leading-tight tabular-nums',
+              disponible >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
+            )}>
+              {fmtMoney(disponible, currency)}
+            </p>
+            {listasEnCurso > 0 && (
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+                Sin contar listas en curso: <span className="tabular-nums">{fmtMoney(disponible + listasEnCurso, currency)}</span>
+              </p>
+            )}
+          </div>
+          <dl className={cn(
+            'grid grid-cols-1 gap-2 text-sm lg:gap-6',
+            listasEnCurso > 0 ? 'min-[420px]:grid-cols-2 lg:min-w-[600px] lg:grid-cols-4' : 'min-[420px]:grid-cols-3 lg:min-w-[480px]',
+          )}>
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">Ingresos del período</dt>
+              <dd className="font-medium tabular-nums text-gray-800 dark:text-slate-200">{fmtMoney(ingresosPeriodo, currency)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">− Ya pagado (período)</dt>
+              <dd className="font-medium tabular-nums text-gray-800 dark:text-slate-200">{fmtMoney(pagadoPeriodo, currency)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">− Pendiente {isRangeActive(range) ? 'en el rango' : 'del período'}</dt>
+              <dd className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{fmtMoney(montoPendiente, currency)}</dd>
+            </div>
+            {listasEnCurso > 0 && (
+              <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+                <dt className="text-xs text-gray-400 dark:text-slate-500">− Listas en curso</dt>
+                <dd className="font-medium tabular-nums text-gray-500 dark:text-slate-400">{fmtMoney(listasEnCurso, currency)}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </div>
 
       {draftCount > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-900/20 px-4 py-3">
@@ -1314,6 +1603,7 @@ export function ExpensesPage() {
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}
+        defaultSort={{ key: 'date', dir: 'asc' }}
         isExpandable={e => !!e.items && e.items.length > 0}
         renderExpanded={e => (
           <div className="max-w-xs space-y-1 pl-8">
@@ -1342,7 +1632,7 @@ export function ExpensesPage() {
               const created = await userApi.expenses.create(data)
               let attCount = 0
               if (pendingFile) {
-                try { await userApi.attachments.upload(created.id, pendingFile); attCount++ } catch {}
+                try { await userApi.attachments.upload(created.id, pendingFile); attCount++ } catch { /* el egreso ya se creó; el adjunto puede subirse después */ }
               }
               setExpenses(prev => [{ ...created, attachment_count: attCount }, ...prev])
               setModal(null)
@@ -1390,6 +1680,26 @@ export function ExpensesPage() {
           <div className="mt-5 flex gap-3">
             <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
             <button onClick={() => handleDelete(modal.expense)} className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors">Eliminar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'to-list' && (
+        <Modal size="sm" title="Devolver a lista de compra" onClose={() => setModal(null)}>
+          <div className="space-y-3 text-sm text-gray-600 dark:text-slate-400">
+            <p>
+              Se creará una lista de compra <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.expense.label}"</span> con
+              los {modal.expense.items?.length ?? 0} productos del desglose, ya marcados como comprados, para que puedas corregirlos y volver a enviarla.
+            </p>
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              El egreso de {fmtMoney(Number(modal.expense.amount), currency)} se eliminará
+              {modal.expense.attachment_count > 0 && <> junto con su adjunto (la evidencia o la boleta que tenga)</>}.
+              Al reenviar la lista se generará un egreso nuevo con su PDF.
+            </p>
+          </div>
+          <div className="mt-5 flex gap-3">
+            <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+            <button onClick={() => handleToList(modal.expense)} className="flex-1 rounded-xl bg-primary-500 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition-colors">Devolver a lista</button>
           </div>
         </Modal>
       )}

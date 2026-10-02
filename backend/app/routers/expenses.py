@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.database import get_db
@@ -51,8 +51,15 @@ class ExpenseOut(BaseModel):
     attachment_count: int = 0
     shopping_list_id: Optional[uuid.UUID] = None
     items: Optional[list[dict]] = None
+    items_from_list: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class ExpenseItemIn(BaseModel):
+    """Ítem del desglose manual de un egreso compuesto (ver expenses.items)."""
+    label: str = Field(min_length=1, max_length=200)
+    amount: Decimal = Field(gt=0)
 
 
 class ExpenseCreate(BaseModel):
@@ -64,6 +71,8 @@ class ExpenseCreate(BaseModel):
     payment_status: PaymentStatus = PaymentStatus.pendiente
     observation: Optional[str] = None
     responsible_tag: Optional[str] = None
+    # Desglose opcional: si viene, el monto del egreso pasa a ser la suma de los ítems.
+    items: Optional[list[ExpenseItemIn]] = None
 
 
 class ExpenseUpdate(BaseModel):
@@ -76,9 +85,19 @@ class ExpenseUpdate(BaseModel):
     review_status: Optional[ReviewStatus] = None
     observation: Optional[str] = None
     responsible_tag: Optional[str] = None
+    # None = no tocar el desglose; [] = quitarlo; lista = reemplazarlo (y recalcular el monto).
+    items: Optional[list[ExpenseItemIn]] = None
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _items_snapshot(items: list[ExpenseItemIn]) -> tuple[list[dict], Decimal]:
+    """Serializa el desglose manual para JSONB y devuelve también su total."""
+    snapshot = [{"label": i.label.strip(), "amount": str(i.amount)} for i in items]
+    if any(not row["label"] for row in snapshot):
+        raise HTTPException(status_code=400, detail="Cada ítem del desglose necesita una descripción")
+    return snapshot, sum((i.amount for i in items), Decimal("0"))
+
 
 async def _get_open_period(db: AsyncSession, user_id: uuid.UUID) -> Period:
     """Devuelve el período abierto o lanza 409."""
@@ -130,6 +149,7 @@ def _build_out(expense: Expense, cat: Optional[Category], attachment_count: int 
         "attachment_count": attachment_count,
         "shopping_list_id": expense.shopping_list_id,
         "items":            expense.items,
+        "items_from_list":  expense.items_from_list,
     }
 
 
@@ -219,12 +239,16 @@ async def create_expense(
     if not cat:
         raise HTTPException(status_code=400, detail="Categoría no válida")
 
+    data = body.model_dump(exclude={"items"})
+    if body.items:
+        data["items"], data["amount"] = _items_snapshot(body.items)
+
     expense = Expense(
         user_id=current_user.id,
         period_id=open_period.id,
         source=TransactionSource.web,
         review_status=ReviewStatus.confirmado,
-        **body.model_dump(),
+        **data,
     )
     db.add(expense)
     await db.commit()
@@ -275,8 +299,21 @@ async def update_expense(
         if not cat:
             raise HTTPException(status_code=400, detail="Categoría no válida")
 
-    for field, value in body.model_dump(exclude_none=True).items():
+    # Con desglose, el total es siempre la suma de los ítems: no se cambia a mano.
+    if body.items is None and expense.items and body.amount is not None and body.amount != expense.amount:
+        raise HTTPException(status_code=400, detail="El monto de un egreso con desglose se calcula desde sus ítems")
+
+    for field, value in body.model_dump(exclude_none=True, exclude={"items"}).items():
         setattr(expense, field, value)
+
+    if body.items is not None:
+        # El desglose de un egreso enviado desde una lista de compra es su snapshot: no se edita a mano.
+        if expense.items_from_list:
+            raise HTTPException(status_code=400, detail="El desglose de un egreso de lista de compra no se edita manualmente")
+        if body.items:
+            expense.items, expense.amount = _items_snapshot(body.items)
+        else:
+            expense.items = None
 
     if expense.review_status == ReviewStatus.confirmado and expense.amount == 0:
         raise HTTPException(status_code=400, detail="No se puede confirmar un egreso con monto $0")

@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import { adminApi, type User, type Category, type IncomeType, type IngestionToken } from '@/lib/adminApi'
+import { KpiGrid } from '@/components/ui/Grids'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,7 +199,7 @@ export function AdminDashboardPage() {
       </div>
 
       {/* KPI cards principales */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <StatCard
           icon={Users} label="Usuarios" value={regularUsers.length}
           sub={`${activeUsers.length} activos · ${inactiveUsers.length} inactivos`}
@@ -219,7 +220,7 @@ export function AdminDashboardPage() {
           sub={`${activeTokens.length} activos · ${revokedTokens.length} revocados`}
           color="bg-violet-500" to="/admin/tokens"
         />
-      </div>
+      </KpiGrid>
 
       {/* Detalle + actividad reciente */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

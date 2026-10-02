@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type SmtpSettings, type EmailLog, type GeneralSettings, type ReminderSettings } from '@/lib/adminApi'
+import { ScrollTable } from '@/components/ui/ScrollTable'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -563,7 +564,7 @@ export function AdminSettingsPage() {
         ) : logs.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-400 dark:text-slate-500">Sin envíos en el período seleccionado</p>
         ) : (
-          <div className="overflow-x-auto">
+          <ScrollTable>
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
@@ -601,7 +602,7 @@ export function AdminSettingsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollTable>
         )}
       </div>
 

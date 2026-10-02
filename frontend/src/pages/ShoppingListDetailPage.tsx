@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Trash2, Plus, RotateCcw, Pencil, Check, Repeat, Send,
 } from 'lucide-react'
@@ -12,7 +12,7 @@ import {
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
-import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
+import { amountStepFor, parseAmountInput, fmtAmountInput, purchasedTotal } from '@/lib/money'
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
@@ -109,6 +109,63 @@ interface ItemFormData {
   unit_price: string | null
   observation: string | null
   obviable: boolean
+}
+
+// ─── Editar lista (nombre + fecha de compra) ──────────────────────────────────
+
+function EditListModal({ initialName, initialDate, onClose, onSubmit }: {
+  initialName: string
+  initialDate: string | null
+  onClose: () => void
+  onSubmit: (data: { name: string; planned_date: string | null }) => Promise<void>
+}) {
+  const [name, setName] = useState(initialName)
+  const [plannedDate, setPlannedDate] = useState(initialDate ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setError(null); setSaving(true)
+    try { await onSubmit({ name: name.trim(), planned_date: plannedDate || null }) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Error') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Modal size="sm" title="Editar lista" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="rl-name" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Nombre <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="rl-name" autoFocus value={name} onChange={e => setName(e.target.value)}
+            required maxLength={150} className={cn(inputCls, 'w-full')}
+          />
+        </div>
+        <div>
+          <label htmlFor="rl-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Fecha de compra
+          </label>
+          <input id="rl-date" type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} className={cn(inputCls, 'w-full')} />
+          <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
+            Fecha en que se imputa en Egresos y fecha sugerida al enviar. Vacía = hoy.
+          </p>
+        </div>
+        {error && <p className="rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
+          <button
+            type="submit"
+            disabled={saving || !name.trim() || (name.trim() === initialName && (plannedDate || null) === initialDate)}
+            className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}
+          >
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 function ItemFormModal({ title, submitLabel, currency, initial, onClose, onSubmit }: {
@@ -249,11 +306,14 @@ type ModalState =
   | { type: 'edit-item'; item: ShoppingListItem }
   | { type: 'reset' }
   | { type: 'send' }
+  | { type: 'edit-list' }
   | null
 
 export function ShoppingListDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  // Si se llegó desde otra vista (p. ej. el borrador de la lista en Egresos), "Volver" regresa ahí.
+  const backTo = (useLocation().state as { from?: string } | null)?.from ?? '/listas-compra'
   const { user } = useAuth()
   const currency = user?.currency ?? 'CRC'
   const userName = user?.name ?? ''
@@ -323,6 +383,13 @@ export function ShoppingListDetailPage() {
     await load()
   }
 
+  async function handleEditList(data: { name: string; planned_date: string | null }) {
+    if (!id) return
+    await userApi.shoppingLists.update(id, data)
+    setModal(null)
+    await load()
+  }
+
   async function handleReset() {
     if (!id) return
     await userApi.shoppingLists.reset(id)
@@ -334,9 +401,7 @@ export function ShoppingListDetailPage() {
     return <p className="text-sm text-gray-400 dark:text-slate-500">Cargando…</p>
   }
 
-  const purchasedTotal = list.items
-    .filter(i => i.purchased)
-    .reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price ?? 0), 0)
+  const purchasedAmount = purchasedTotal(list.items)
   const wasSent = list.items.some(i => i.sent_at)
   const pendingCount = list.item_count - list.purchased_count
 
@@ -421,10 +486,21 @@ export function ShoppingListDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">{list.name}</h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="min-w-0 break-words text-xl font-semibold text-gray-900 dark:text-slate-100">{list.name}</h1>
+            <button
+              onClick={() => setModal({ type: 'edit-list' })}
+              title="Editar lista"
+              aria-label="Editar lista"
+              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-            {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedTotal, currency)}
+            {list.purchased_count} de {list.item_count} productos comprados · Total comprado: {fmtMoney(purchasedAmount, currency)}
+            {list.planned_date && <> · Fecha de compra: {list.planned_date.split('-').reverse().join('/')}</>}
           </p>
         </div>
         <SentStatusBadge sent={wasSent} />
@@ -443,11 +519,11 @@ export function ShoppingListDetailPage() {
           <p className="text-xs text-gray-500 dark:text-slate-400">Pendientes</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">{pendingCount}</p>
         </div>
-        <KpiCard label="Total comprado" amount={purchasedTotal} currency={currency} color="text-primary-600 dark:text-primary-400" />
+        <KpiCard label="Total comprado" amount={purchasedAmount} currency={currency} color="text-primary-600 dark:text-primary-400" />
       </KpiGrid>
 
       <div className="flex justify-end gap-2">
-        <button onClick={() => navigate('/listas-compra')} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
+        <button onClick={() => navigate(backTo)} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
           <ArrowLeft size={14} /> Volver
         </button>
         <button onClick={() => setModal({ type: 'reset' })} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
@@ -502,6 +578,10 @@ export function ShoppingListDetailPage() {
         />
       )}
 
+      {modal?.type === 'edit-list' && (
+        <EditListModal initialName={list.name} initialDate={list.planned_date} onClose={() => setModal(null)} onSubmit={handleEditList} />
+      )}
+
       {modal?.type === 'reset' && (
         <Modal size="sm" title="Reiniciar lista" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
@@ -522,9 +602,10 @@ export function ShoppingListDetailPage() {
           currency={currency}
           defaultResponsible={userName}
           onClose={() => setModal(null)}
-          onSuccess={async () => {
+          onSuccess={async outcome => {
             setModal(null)
-            await load()
+            if (outcome === 'deleted') navigate(backTo)
+            else await load()
           }}
         />
       )}

@@ -120,7 +120,15 @@ export interface Expense {
   created_at: string
   attachment_count: number
   shopping_list_id: string | null
-  items: { label: string; amount: string }[] | null
+  items: ExpenseItem[] | null
+  /** El desglose viene de una lista de compra: ítems y monto no se editan a mano. */
+  items_from_list: boolean
+}
+
+/** Ítem del desglose de un egreso compuesto (lista de compra o desglose manual). */
+export interface ExpenseItem {
+  label: string
+  amount: string
 }
 
 export interface AttachmentOut {
@@ -140,6 +148,8 @@ export interface ExpenseCreatePayload {
   payment_status?: 'pendiente' | 'saldado'
   observation?: string | null
   responsible_tag?: string | null
+  /** Desglose manual; si viene, el backend usa su suma como monto. [] lo quita (solo update). */
+  items?: ExpenseItem[] | null
 }
 
 // ─── Integraciones (canales de ingesta) ────────────────────────────────────────
@@ -177,6 +187,8 @@ export interface ExpenseUpdatePayload {
   review_status?: 'borrador' | 'confirmado'
   observation?: string | null
   responsible_tag?: string | null
+  /** Desglose manual; si viene, el backend usa su suma como monto. [] lo quita (solo update). */
+  items?: ExpenseItem[] | null
 }
 
 // ─── Períodos ─────────────────────────────────────────────────────────────────
@@ -259,6 +271,8 @@ export interface ShoppingList {
   name: string
   default_category_id: string | null
   archived: boolean
+  /** Fecha en que se imputa la compra (borrador en Egresos y fecha sugerida al enviar). */
+  planned_date: string | null
   created_at: string
   updated_at: string
   last_sent_at: string | null
@@ -266,17 +280,23 @@ export interface ShoppingList {
   item_count: number
   purchased_count: number
   pending_send_count: number
+  /** Monto comprado aún no enviado a egreso (el borrador que se ve en Egresos). */
+  pending_send_amount: string
+  pending_send_item_ids: string[]
 }
 
 export interface ShoppingListCreatePayload {
   name: string
   default_category_id?: string | null
+  planned_date?: string | null
 }
 
 export interface ShoppingListUpdatePayload {
   name?: string
   default_category_id?: string | null
   archived?: boolean
+  /** null quita la fecha. */
+  planned_date?: string | null
 }
 
 export interface ShoppingListItemCreatePayload {
@@ -444,6 +464,8 @@ export const userApi = {
     clone:  (id: string, name?: string)                  => request<ShoppingList>(`/v1/shopping-lists/${id}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
     reset:  (id: string)                                 => request<ShoppingList>(`/v1/shopping-lists/${id}/reset`, { method: 'POST' }),
     sendToExpense: (id: string, body: SendToExpensePayload) => request<Expense>(`/v1/shopping-lists/${id}/send-to-expense`, { method: 'POST', body: JSON.stringify(body) }),
+    /** Convierte un egreso con desglose en una lista nueva y elimina el egreso (con su adjunto). */
+    fromExpense: (expenseId: string) => request<ShoppingList>(`/v1/shopping-lists/from-expense/${expenseId}`, { method: 'POST' }),
     items: {
       create: (listId: string, body: ShoppingListItemCreatePayload)                => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items`, { method: 'POST', body: JSON.stringify(body) }),
       update: (listId: string, itemId: string, body: ShoppingListItemUpdatePayload) => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(body) }),

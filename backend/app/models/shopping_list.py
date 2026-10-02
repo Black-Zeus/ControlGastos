@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, Numeric, Integer, ForeignKey, Index, func, Text
+from sqlalchemy import String, Boolean, Date, Numeric, Integer, ForeignKey, Index, func, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
@@ -30,6 +30,9 @@ class ShoppingList(Base):
         PG_UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
     archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Fecha en que se imputa la compra (p. ej. el 24/12 para Navidad): fecha del borrador que la
+    # lista muestra en Egresos y fecha sugerida del egreso al enviarla. Null = hoy.
+    planned_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now(), nullable=False

@@ -1,28 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, X } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type Category, type CategoryPayload } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -262,7 +247,7 @@ export function AdminCategoriesPage() {
       <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Categorías del sistema</h1>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',       value: stats.total,      color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Recurrentes', value: stats.recurrente, color: 'text-blue-600 dark:text-blue-400' },
@@ -274,7 +259,7 @@ export function AdminCategoriesPage() {
             <p className={cn('mt-1 text-2xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       {/* Filtros */}
       <FilterBar
@@ -296,7 +281,7 @@ export function AdminCategoriesPage() {
       />
 
       {modal?.type === 'create' && (
-        <Modal title="Nueva categoría del sistema" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Nueva categoría del sistema" onClose={() => setModal(null)}>
           <CategoryForm
             submitLabel="Crear categoría"
             onCancel={() => setModal(null)}
@@ -309,7 +294,7 @@ export function AdminCategoriesPage() {
         </Modal>
       )}
       {modal?.type === 'edit' && (
-        <Modal title={`Editar — ${modal.cat.name}`} onClose={() => setModal(null)}>
+        <Modal size="sm" title={`Editar — ${modal.cat.name}`} onClose={() => setModal(null)}>
           <CategoryForm
             initial={modal.cat}
             submitLabel="Guardar"
