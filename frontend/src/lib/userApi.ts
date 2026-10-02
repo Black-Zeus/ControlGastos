@@ -120,7 +120,13 @@ export interface Expense {
   created_at: string
   attachment_count: number
   shopping_list_id: string | null
-  items: { label: string; amount: string }[] | null
+  items: ExpenseItem[] | null
+}
+
+/** Ítem del desglose de un egreso compuesto (lista de compra o desglose manual). */
+export interface ExpenseItem {
+  label: string
+  amount: string
 }
 
 export interface AttachmentOut {
@@ -140,6 +146,8 @@ export interface ExpenseCreatePayload {
   payment_status?: 'pendiente' | 'saldado'
   observation?: string | null
   responsible_tag?: string | null
+  /** Desglose manual; si viene, el backend usa su suma como monto. [] lo quita (solo update). */
+  items?: ExpenseItem[] | null
 }
 
 // ─── Integraciones (canales de ingesta) ────────────────────────────────────────
@@ -177,6 +185,8 @@ export interface ExpenseUpdatePayload {
   review_status?: 'borrador' | 'confirmado'
   observation?: string | null
   responsible_tag?: string | null
+  /** Desglose manual; si viene, el backend usa su suma como monto. [] lo quita (solo update). */
+  items?: ExpenseItem[] | null
 }
 
 // ─── Períodos ─────────────────────────────────────────────────────────────────
