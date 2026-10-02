@@ -22,13 +22,13 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
   vista previa de PDF a pantalla completa en mobile.
 - Formularios de Ingreso, Egreso, Agregar producto, Nuevo período y Perfil en 1 columna.
 
+- Panel admin con los mismos componentes (KPIs, `Modal`, `ScrollTable`).
+- `eslint` 10 (flat config) instalado; `npm run lint` en verde.
+
 ### Pendiente
 
-- **Panel admin** (fuera de alcance de esta tanda): KPIs `grid-cols-2`, copias locales de `Modal`
-  en `AdminCategories`/`AdminUsers`/`AdminIncomeTypes`, tabla de `AdminSettingsPage` sin
-  `ScrollTable`, grid de 3 columnas en `AdminIncomeTypesPage`.
-- Revisión visual completa en 320/360/375/390/412/430/480/768 px y desktop antes de mergear.
-- `npm run lint` no funciona: `eslint` no está en las dependencias del frontend.
+- Evaluar las reglas de `react-hooks` 7 orientadas al React Compiler (`set-state-in-effect`,
+  `static-components`, `preserve-manual-memoization`), hoy desactivadas en `eslint.config.js`.
 
 ---
 
@@ -38,8 +38,15 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
 
 `DataTable` acepta `RowAction.primary`: si alguna acción lo marca, solo las primarias quedan como
 botón y el resto va a un menú "⋯" (Radix `DropdownMenu`). En Egresos quedan visibles **Editar** y
-**Pasar a saldado**. Pendiente evaluar: dejar también **Confirmar borrador** como primaria (solo
-en filas en borrador) y aplicar el mismo patrón a otras tablas con muchas acciones.
+**Pasar a saldado**, y **Confirmar borrador** solo en filas en borrador. Pendiente evaluar el mismo
+patrón en otras tablas con muchas acciones.
+
+### ~~Rango de fechas y disponible por compromisos~~ — hecho
+
+`DateRangeFilter` (Desde/Hasta + atajos Hoy, Esta semana, 7 y 15 días hacia adelante) filtra la
+tabla y los KPIs. La tarjeta **Disponible** calcula ingresos del período − ya pagado en el período −
+pendiente en la vista (rango + filtros). La tabla ordena por fecha ascendente por defecto.
+Posible extensión: el mismo selector en Ingresos.
 
 ### Selección múltiple y acciones masivas
 
@@ -106,9 +113,8 @@ vía migración Alembic) — no agregar una columna paralela.
 
 ### Trabajo restante — Listas de Compra
 
-1. **Editar el título de la lista**: el backend ya lo soporta (`PATCH /shopping-lists/{id}` acepta
-   `name`), falta la UI en `ShoppingListDetailPage.tsx` y/o `ShoppingListsPage.tsx` (edición inline
-   o modal).
+1. ~~**Editar el título de la lista**~~ — hecho (lápiz junto al título en el detalle). El listado
+   muestra además el monto ya comprado de cada lista.
 2. **Listas siempre visibles en Egresos, saldadas solo al enviarlas**: las listas de compra deben
    aparecer siempre en la pestaña Egresos (como gasto en curso o pendiente), y pasar a `saldado`
    **solo** cuando se pulsa "Enviar a egreso". Hoy la lista no aparece en Egresos hasta enviarla, y
@@ -119,15 +125,10 @@ vía migración Alembic) — no agregar una columna paralela.
    - Revisar el texto del botón y de la descripción de "Enviar a egreso" (quizá "Marcar como
      saldado" o "Cerrar compra") para que refleje el nuevo comportamiento.
 
-### Trabajo restante — Desglose manual en el formulario de egresos
+### ~~Desglose manual en el formulario de egresos~~ — hecho
 
-1. **Formulario de nuevo/editar egreso** — sección colapsable "Desglosar en ítems":
-   - Lista editable de pares (descripción, monto)
-   - Botón "Agregar ítem"
-   - Total calculado en tiempo real
-   - Si hay ítems, el campo de monto principal se vuelve solo lectura (= suma)
-2. Reutiliza la columna `items` y la fila expandible que ya están implementadas — no requiere
-   tocar el esquema ni `DataTable`, solo el formulario de `ExpensesPage.tsx`.
+Sección "Desglosar en ítems" en el formulario de egreso. La API acepta `items` en create/update y
+usa su suma como monto; los egresos de lista de compra no admiten desglose manual.
 
 #### Mobile (React Native / Expo — pendiente de arrancar)
 
