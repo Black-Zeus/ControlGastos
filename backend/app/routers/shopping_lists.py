@@ -531,7 +531,7 @@ async def _attach_list_evidence(
             observation=expense.observation,
             rows=rows,
         )
-        pdf = await generate_pdf(html)
+        pdf = await generate_pdf(html, full_bleed=True)
 
         slug = re.sub(r"[^\w-]+", "-", shopping_list.name.lower()).strip("-")[:60] or "lista"
         filename = f"lista-{slug}-{sent_at:%Y%m%d}.pdf"
