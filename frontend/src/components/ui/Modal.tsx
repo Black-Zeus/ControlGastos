@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 // Reemplaza las copias locales de `Modal` de cada página. En mobile ocupa casi
 // todo el viewport (dvh, para respetar la barra de navegación de Android) y el
 // cuerpo hace scroll propio, dejando el encabezado (título + X) siempre visible.
+// Solo se cierra con sus controles explícitos (X, Cancelar…), no al pulsar fuera.
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
@@ -32,7 +33,7 @@ export function Modal({ title, onClose, children, size = 'md' }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         role="dialog"
         aria-modal="true"

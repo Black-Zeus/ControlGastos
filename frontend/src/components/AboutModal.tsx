@@ -21,7 +21,7 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6">
         <button
           onClick={onClose}
