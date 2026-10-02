@@ -1190,12 +1190,14 @@ export function ExpensesPage() {
     {
       icon:     Pencil,
       label:    'Editar',
+      primary:  true,
       disabled: () => !!periodClosed,
       onClick:  expense => setModal({ type: 'edit', expense }),
     },
     {
       icon:     CreditCard,
       label:    'Pasar a saldado',
+      primary:  true,
       disabled: e => e.payment_status !== 'pendiente' || !!periodClosed,
       onClick:  togglePayment,
     },
