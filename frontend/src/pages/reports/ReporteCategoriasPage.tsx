@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, authToken, type Period, type Expense } from '@/lib/userApi'
 import { MONTHS_SHORT, fmtShort, CAT_COLORS, confirmedOnly } from '@/lib/reportUtils'
+import { ScrollTable } from '@/components/ui/ScrollTable'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -206,7 +207,7 @@ export function ReporteCategoriasPage() {
 
   const gridStroke = isDark ? '#1e293b' : '#f1f5f9'
   const axisColor  = isDark ? '#64748b' : '#94a3b8'
-  const card       = 'rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
+  const card       = 'min-w-0 rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
 
   const radioBase   = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors'
   const radioActive = 'bg-primary-500 text-white'
@@ -345,7 +346,7 @@ export function ReporteCategoriasPage() {
           {/* Tabla categorías × períodos */}
           <div className={card}>
             <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-slate-100">Tabla de egresos por categoría y período</h3>
-            <div className="overflow-x-auto">
+            <ScrollTable>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-slate-800">
@@ -387,7 +388,7 @@ export function ReporteCategoriasPage() {
                   </tr>
                 </tfoot>
               </table>
-            </div>
+            </ScrollTable>
           </div>
         </>
       )}

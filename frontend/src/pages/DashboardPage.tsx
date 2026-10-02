@@ -9,42 +9,13 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, type Period, type Expense, type Income } from '@/lib/userApi'
-import { fmtMoney } from '@/components/ui/KpiCard'
+import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
+import { KpiGrid } from '@/components/ui/Grids'
 import { confirmedOnly } from '@/lib/reportUtils'
+import { ScrollTable } from '@/components/ui/ScrollTable'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio',
                  'Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-
-function KpiCard({ label, value, icon: Icon, color, sub }: {
-  label: string
-  value: string
-  icon: React.ElementType
-  color: 'green' | 'orange' | 'purple' | 'red' | 'blue' | 'gray'
-  sub?: string
-}) {
-  const colors = {
-    green:  'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    orange: 'bg-orange-50 text-orange-500 dark:bg-orange-900/30 dark:text-orange-400',
-    purple: 'bg-violet-50 text-violet-500 dark:bg-violet-900/30 dark:text-violet-400',
-    red:    'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
-    blue:   'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-    gray:   'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400',
-  }
-  return (
-    <div className="flex items-start gap-4 rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft">
-      <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', colors[color])}>
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
-        <p className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{value}</p>
-        {sub && <p className="mt-0.5 text-[10px] text-gray-400 dark:text-slate-500">{sub}</p>}
-      </div>
-    </div>
-  )
-}
 
 // ─── Custom Tooltip ───────────────────────────────────────────────────────────
 
@@ -241,7 +212,7 @@ export function DashboardPage() {
   // ── Colores del tema ──────────────────────────────────────────────────────
   const gridStroke = isDark ? '#1e293b' : '#f1f5f9'
   const axisColor  = isDark ? '#64748b' : '#94a3b8'
-  const card       = 'rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
+  const card       = 'min-w-0 rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -306,26 +277,28 @@ export function DashboardPage() {
       </div>
 
       {/* ── KPIs ────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <KpiCard label="Total ingresos"     value={fmtMoney(m.totalIngresos, currency)}     icon={TrendingUp}   color="green"  sub={`${m.cntIngresos} registros`} />
-        <KpiCard label="Egresos saldados"   value={fmtMoney(m.egresosSaldados, currency)}   icon={TrendingDown} color="orange" sub={`${m.cntSaldados} registros`} />
-        <KpiCard label="Egresos pendientes" value={fmtMoney(m.egresosPendientes, currency)} icon={Clock}        color="purple" sub={`${m.cntPendientes} registros`} />
-        <KpiCard label="Egresos reservados" value={fmtMoney(m.egresosReservados, currency)} icon={TrendingDown} color="blue"   sub={`${m.cntEgresos} registros`} />
+      <KpiGrid cols={3}>
+        <KpiCard label="Total ingresos"     value={fmtMoney(m.totalIngresos, currency)}     icon={TrendingUp}   tone="green"  sub={`${m.cntIngresos} registros`} className="sm:p-5" />
+        <KpiCard label="Egresos saldados"   value={fmtMoney(m.egresosSaldados, currency)}   icon={TrendingDown} tone="orange" sub={`${m.cntSaldados} registros`} className="sm:p-5" />
+        <KpiCard label="Egresos pendientes" value={fmtMoney(m.egresosPendientes, currency)} icon={Clock}        tone="purple" sub={`${m.cntPendientes} registros`} className="sm:p-5" />
+        <KpiCard label="Egresos reservados" value={fmtMoney(m.egresosReservados, currency)} icon={TrendingDown} tone="blue"   sub={`${m.cntEgresos} registros`} className="sm:p-5" />
         <KpiCard
           label="Dinero libre"
           value={fmtMoney(m.dineroLibre, currency)}
           icon={Wallet}
-          color={m.dineroLibre >= 0 ? 'green' : 'red'}
+          tone={m.dineroLibre >= 0 ? 'green' : 'red'}
           sub={`${m.cntIngresos + m.cntEgresos} registros`}
+          className="sm:p-5"
         />
         <KpiCard
           label="Libre solo pagado"
           value={fmtMoney(m.libreSoloPagado, currency)}
           icon={Wallet}
-          color={m.libreSoloPagado >= 0 ? 'green' : 'red'}
+          tone={m.libreSoloPagado >= 0 ? 'green' : 'red'}
           sub={`${m.cntIngresos + m.cntSaldados} registros`}
+          className="sm:p-5"
         />
-      </div>
+      </KpiGrid>
 
       {/* ── Flujo diario ────────────────────────────────────────────────── */}
       <div className={card}>
@@ -400,43 +373,45 @@ export function DashboardPage() {
               <div className="flex items-center justify-center py-6 text-sm text-gray-400 dark:text-slate-500">Sin datos</div>
             ) : (
               <>
-                <table className="w-full text-xs [table-layout:fixed]">
-                  <colgroup><col /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /></colgroup>
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-slate-800">
-                      <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Responsable</th>
-                      <th className="pb-2 text-right font-medium text-emerald-600 dark:text-emerald-400">Recibido</th>
-                      <th className="pb-2 text-right font-medium text-amber-500 dark:text-amber-400">Pendiente</th>
-                      <th className="pb-2 text-right font-medium text-orange-500 dark:text-orange-400">Egresos</th>
-                      <th className="pb-2 text-right font-medium text-gray-500 dark:text-slate-400">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
-                    {responsableData.map(r => (
-                      <tr key={r.name}>
-                        <td className="py-2 font-medium text-gray-700 dark:text-slate-300 truncate">{r.name}</td>
-                        <td className="py-2 text-right text-emerald-600 dark:text-emerald-400">{fmt(r.ingRecibidos)}</td>
-                        <td className="py-2 text-right text-amber-500 dark:text-amber-400">{r.ingPendientes > 0 ? fmt(r.ingPendientes) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
-                        <td className="py-2 text-right text-orange-500 dark:text-orange-400">{fmt(r.egresos)}</td>
-                        <td className={cn('py-2 text-right font-semibold', r.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
-                          {fmt(r.balance)}
-                        </td>
+                <ScrollTable minWidth="min-w-[540px]">
+                  <table className="w-full text-xs [table-layout:fixed]">
+                    <colgroup><col /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /></colgroup>
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-slate-800">
+                        <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Responsable</th>
+                        <th className="pb-2 text-right font-medium text-emerald-600 dark:text-emerald-400">Recibido</th>
+                        <th className="pb-2 text-right font-medium text-amber-500 dark:text-amber-400">Pendiente</th>
+                        <th className="pb-2 text-right font-medium text-orange-500 dark:text-orange-400">Egresos</th>
+                        <th className="pb-2 text-right font-medium text-gray-500 dark:text-slate-400">Balance</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <table className="w-full text-xs mt-3 [table-layout:fixed]">
-                  <colgroup><col /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /></colgroup>
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-200 dark:border-slate-700">
-                      <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
-                      <td className="pt-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(resTotRecibidos)}</td>
-                      <td className="pt-2 text-right font-semibold text-amber-500 dark:text-amber-400">{fmt(resTotPendientes)}</td>
-                      <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(resTotEgresos)}</td>
-                      <td className={cn('pt-2 text-right font-semibold', resTotBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>{fmt(resTotBalance)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
+                      {responsableData.map(r => (
+                        <tr key={r.name}>
+                          <td className="py-2 font-medium text-gray-700 dark:text-slate-300 truncate">{r.name}</td>
+                          <td className="py-2 text-right text-emerald-600 dark:text-emerald-400">{fmt(r.ingRecibidos)}</td>
+                          <td className="py-2 text-right text-amber-500 dark:text-amber-400">{r.ingPendientes > 0 ? fmt(r.ingPendientes) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
+                          <td className="py-2 text-right text-orange-500 dark:text-orange-400">{fmt(r.egresos)}</td>
+                          <td className={cn('py-2 text-right font-semibold', r.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
+                            {fmt(r.balance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <table className="w-full text-xs mt-3 [table-layout:fixed]">
+                    <colgroup><col /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /></colgroup>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-200 dark:border-slate-700">
+                        <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
+                        <td className="pt-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(resTotRecibidos)}</td>
+                        <td className="pt-2 text-right font-semibold text-amber-500 dark:text-amber-400">{fmt(resTotPendientes)}</td>
+                        <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(resTotEgresos)}</td>
+                        <td className={cn('pt-2 text-right font-semibold', resTotBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>{fmt(resTotBalance)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </ScrollTable>
               </>
             )}
           </div>
@@ -482,40 +457,42 @@ export function DashboardPage() {
             <div className="flex flex-1 items-center justify-center text-sm text-gray-400 dark:text-slate-500">Sin egresos registrados</div>
           ) : (
             <>
-              <div className="flex-1">
-                <table className="w-full text-xs [table-layout:fixed]">
-                  <colgroup><col /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /></colgroup>
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-slate-800">
-                      <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Tipología</th>
-                      <th className="pb-2 text-right font-medium text-orange-400 dark:text-orange-400">Saldado</th>
-                      <th className="pb-2 text-right font-medium text-violet-500 dark:text-violet-400">Pendiente</th>
-                      <th className="pb-2 text-right font-medium text-gray-500 dark:text-slate-400">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
-                    {categoryTableData.map(c => (
-                      <tr key={c.name} className="group hover:bg-gray-50 dark:hover:bg-slate-800/40">
-                        <td className="py-2 font-medium text-gray-700 dark:text-slate-300 truncate">{c.name}</td>
-                        <td className="py-2 text-right text-orange-500 dark:text-orange-400">{c.saldado > 0 ? fmt(c.saldado) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
-                        <td className="py-2 text-right text-violet-600 dark:text-violet-400">{c.pendiente > 0 ? fmt(c.pendiente) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
-                        <td className="py-2 text-right font-semibold text-gray-800 dark:text-slate-200">{fmt(c.total)}</td>
+              <ScrollTable minWidth="min-w-[440px]" fill>
+                <div className="flex-1">
+                  <table className="w-full text-xs [table-layout:fixed]">
+                    <colgroup><col /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /></colgroup>
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-slate-800">
+                        <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Tipología</th>
+                        <th className="pb-2 text-right font-medium text-orange-400 dark:text-orange-400">Saldado</th>
+                        <th className="pb-2 text-right font-medium text-violet-500 dark:text-violet-400">Pendiente</th>
+                        <th className="pb-2 text-right font-medium text-gray-500 dark:text-slate-400">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
+                      {categoryTableData.map(c => (
+                        <tr key={c.name} className="group hover:bg-gray-50 dark:hover:bg-slate-800/40">
+                          <td className="py-2 font-medium text-gray-700 dark:text-slate-300 truncate">{c.name}</td>
+                          <td className="py-2 text-right text-orange-500 dark:text-orange-400">{c.saldado > 0 ? fmt(c.saldado) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
+                          <td className="py-2 text-right text-violet-600 dark:text-violet-400">{c.pendiente > 0 ? fmt(c.pendiente) : <span className="text-gray-300 dark:text-slate-600">—</span>}</td>
+                          <td className="py-2 text-right font-semibold text-gray-800 dark:text-slate-200">{fmt(c.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <table className="w-full text-xs mt-auto [table-layout:fixed]">
+                  <colgroup><col /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /></colgroup>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200 dark:border-slate-700">
+                      <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
+                      <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(catTotSaldado)}</td>
+                      <td className="pt-2 text-right font-semibold text-violet-600 dark:text-violet-400">{fmt(catTotPendiente)}</td>
+                      <td className="pt-2 text-right font-semibold text-gray-800 dark:text-slate-200">{fmt(catTotTotal)}</td>
+                    </tr>
+                  </tfoot>
                 </table>
-              </div>
-              <table className="w-full text-xs mt-auto [table-layout:fixed]">
-                <colgroup><col /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /></colgroup>
-                <tfoot>
-                  <tr className="border-t-2 border-gray-200 dark:border-slate-700">
-                    <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
-                    <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(catTotSaldado)}</td>
-                    <td className="pt-2 text-right font-semibold text-violet-600 dark:text-violet-400">{fmt(catTotPendiente)}</td>
-                    <td className="pt-2 text-right font-semibold text-gray-800 dark:text-slate-200">{fmt(catTotTotal)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+              </ScrollTable>
             </>
           )}
         </div>
@@ -523,51 +500,53 @@ export function DashboardPage() {
         {/* Tabla flujo por día */}
         <div className={cn(card, 'flex flex-col')}>
           <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-slate-100">Flujo por día</h3>
-          <div className="flex-1">
-            <table className="w-full text-xs [table-layout:fixed]">
+          <ScrollTable minWidth="min-w-[440px]" fill>
+            <div className="flex-1">
+              <table className="w-full text-xs [table-layout:fixed]">
+                <colgroup><col style={{ width: '12%' }} /><col /><col /><col /></colgroup>
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-slate-800">
+                    <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Día</th>
+                    <th className="pb-2 text-right font-medium text-orange-400">Saldado</th>
+                    <th className="pb-2 text-right font-medium text-violet-500">Pendiente</th>
+                    <th className="pb-2 text-right font-medium text-emerald-500">Ingresos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
+                  {dailyData.map(d => {
+                    const hasActivity = d.saldado > 0 || d.pendiente > 0 || d.ingresos > 0
+                    return (
+                      <tr
+                        key={d.dia}
+                        className={cn(
+                          'transition-colors',
+                          hasActivity
+                            ? 'hover:bg-gray-50 dark:hover:bg-slate-800/40'
+                            : 'opacity-30',
+                        )}
+                      >
+                        <td className="py-1.5 font-medium text-gray-600 dark:text-slate-400">{d.dia}</td>
+                        <td className="py-1.5 text-right text-orange-500 dark:text-orange-400">{d.saldado > 0 ? fmt(d.saldado) : '—'}</td>
+                        <td className="py-1.5 text-right text-violet-600 dark:text-violet-400">{d.pendiente > 0 ? fmt(d.pendiente) : '—'}</td>
+                        <td className="py-1.5 text-right text-emerald-600 dark:text-emerald-400">{d.ingresos > 0 ? fmt(d.ingresos) : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <table className="w-full text-xs mt-auto [table-layout:fixed]">
               <colgroup><col style={{ width: '12%' }} /><col /><col /><col /></colgroup>
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-slate-800">
-                  <th className="pb-2 text-left font-medium text-gray-500 dark:text-slate-400">Día</th>
-                  <th className="pb-2 text-right font-medium text-orange-400">Saldado</th>
-                  <th className="pb-2 text-right font-medium text-violet-500">Pendiente</th>
-                  <th className="pb-2 text-right font-medium text-emerald-500">Ingresos</th>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 dark:border-slate-700">
+                  <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
+                  <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(m.egresosSaldados)}</td>
+                  <td className="pt-2 text-right font-semibold text-violet-600 dark:text-violet-400">{fmt(m.egresosPendientes)}</td>
+                  <td className="pt-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(m.totalIngresos)}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
-                {dailyData.map(d => {
-                  const hasActivity = d.saldado > 0 || d.pendiente > 0 || d.ingresos > 0
-                  return (
-                    <tr
-                      key={d.dia}
-                      className={cn(
-                        'transition-colors',
-                        hasActivity
-                          ? 'hover:bg-gray-50 dark:hover:bg-slate-800/40'
-                          : 'opacity-30',
-                      )}
-                    >
-                      <td className="py-1.5 font-medium text-gray-600 dark:text-slate-400">{d.dia}</td>
-                      <td className="py-1.5 text-right text-orange-500 dark:text-orange-400">{d.saldado > 0 ? fmt(d.saldado) : '—'}</td>
-                      <td className="py-1.5 text-right text-violet-600 dark:text-violet-400">{d.pendiente > 0 ? fmt(d.pendiente) : '—'}</td>
-                      <td className="py-1.5 text-right text-emerald-600 dark:text-emerald-400">{d.ingresos > 0 ? fmt(d.ingresos) : '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
+              </tfoot>
             </table>
-          </div>
-          <table className="w-full text-xs mt-auto [table-layout:fixed]">
-            <colgroup><col style={{ width: '12%' }} /><col /><col /><col /></colgroup>
-            <tfoot>
-              <tr className="border-t-2 border-gray-200 dark:border-slate-700">
-                <td className="pt-2 font-semibold text-gray-600 dark:text-slate-400">Total</td>
-                <td className="pt-2 text-right font-semibold text-orange-500 dark:text-orange-400">{fmt(m.egresosSaldados)}</td>
-                <td className="pt-2 text-right font-semibold text-violet-600 dark:text-violet-400">{fmt(m.egresosPendientes)}</td>
-                <td className="pt-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(m.totalIngresos)}</td>
-              </tr>
-            </tfoot>
-          </table>
+          </ScrollTable>
         </div>
       </div>
 

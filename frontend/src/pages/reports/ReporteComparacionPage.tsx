@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, authToken, type Period, type Expense, type Income } from '@/lib/userApi'
 import { MONTHS, MONTHS_SHORT, calcMetrics, fmtShort, type Metrics } from '@/lib/reportUtils'
+import { ScrollTable } from '@/components/ui/ScrollTable'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -211,7 +212,7 @@ export function ReporteComparacionPage() {
 
   const gridStroke = isDark ? '#1e293b' : '#f1f5f9'
   const axisColor  = isDark ? '#64748b' : '#94a3b8'
-  const card       = 'rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
+  const card       = 'min-w-0 rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
 
   const selectCls = cn(
     'rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900',
@@ -275,7 +276,7 @@ export function ReporteComparacionPage() {
           {/* KPI table */}
           <div className={card}>
             <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-slate-100">Resumen comparativo</h3>
-            <div className="overflow-x-auto">
+            <ScrollTable>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-slate-800">
@@ -316,7 +317,7 @@ export function ReporteComparacionPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollTable>
           </div>
 
           {/* Gráfico + tabla categorías */}
@@ -350,7 +351,7 @@ export function ReporteComparacionPage() {
             {/* Tabla categorías */}
             <div className={cn(card, 'flex flex-col')}>
               <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-slate-100">Detalle por categoría</h3>
-              <div className="flex-1 overflow-y-auto min-h-0">
+              <ScrollTable className="flex-1 min-h-0 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-white dark:bg-slate-900">
                     <tr className="border-b border-gray-100 dark:border-slate-800">
@@ -377,7 +378,7 @@ export function ReporteComparacionPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollTable>
             </div>
           </div>
         </>

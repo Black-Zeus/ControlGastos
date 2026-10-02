@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { userApi, authToken, type Period } from '@/lib/userApi'
 import { MONTHS_SHORT, calcMetrics, fmtShort, type Metrics } from '@/lib/reportUtils'
+import { KpiGrid } from '@/components/ui/Grids'
+import { ScrollTable } from '@/components/ui/ScrollTable'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -192,7 +194,7 @@ export function ReporteTendenciaPage() {
 
   const gridStroke = isDark ? '#1e293b' : '#f1f5f9'
   const axisColor  = isDark ? '#64748b' : '#94a3b8'
-  const card       = 'rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
+  const card       = 'min-w-0 rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-soft'
 
   const radioBase  = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors'
   const radioActive = 'bg-primary-500 text-white'
@@ -262,11 +264,11 @@ export function ReporteTendenciaPage() {
           </div>
 
           {/* KPI summary cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <KpiGrid cols={4}>
             {KPI_SUMMARY.map(k => (
               <div key={k.key} className={cn(card, 'py-4')}>
                 <p className="text-xs font-medium text-gray-500 dark:text-slate-400">{k.label}</p>
-                <p className={cn('mt-1 text-lg font-semibold truncate', k.color)}>
+                <p className={cn('mt-1 break-words text-lg font-semibold leading-tight', k.color)}>
                   {fmt(totals[k.key as keyof typeof totals])}
                 </p>
                 {k.key === 'dineroLibre' && (
@@ -274,7 +276,7 @@ export function ReporteTendenciaPage() {
                 )}
               </div>
             ))}
-          </div>
+          </KpiGrid>
 
           {/* Gráfico */}
           <div ref={chartRef} className={card}>
@@ -305,7 +307,7 @@ export function ReporteTendenciaPage() {
           {/* Tabla mes a mes */}
           <div className={card}>
             <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-slate-100">Detalle por período</h3>
-            <div className="overflow-x-auto">
+            <ScrollTable>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-slate-800">
@@ -355,7 +357,7 @@ export function ReporteTendenciaPage() {
                   </tr>
                 </tfoot>
               </table>
-            </div>
+            </ScrollTable>
           </div>
         </>
       )}
