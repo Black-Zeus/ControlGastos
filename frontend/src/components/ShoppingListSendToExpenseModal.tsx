@@ -99,6 +99,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
   const [date, setDate] = useState(list.planned_date ?? toLocalISODate(new Date()))
   const [sent, setSent] = useState(false)
   const [categoryId, setCategoryId] = useState(list.default_category_id ?? '')
+  const [label, setLabel] = useState(list.name)
   const [observation, setObservation] = useState('')
   const [responsible, setResponsible] = useState(defaultResponsible)
   const [saving, setSaving] = useState(false)
@@ -123,6 +124,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
       if (responsible.trim()) addResponsibleTag(responsible)
       await userApi.shoppingLists.sendToExpense(list.id, {
         date,
+        label: label.trim() || list.name,
         category_id: categoryId || undefined,
         observation: observation || null,
         responsible_tag: responsible || null,
@@ -189,6 +191,13 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
         )}
 
         <div>
+          <label htmlFor="ste-label" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Descripción <span className="text-red-500">*</span>
+          </label>
+          <input id="ste-label" value={label} onChange={e => setLabel(e.target.value)} required maxLength={255} className={cn(inputCls, 'w-full')} />
+        </div>
+
+        <div>
           <label htmlFor="ste-date" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">Fecha</label>
           <input id="ste-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className={cn(inputCls, 'w-full')} />
         </div>
@@ -220,7 +229,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div>
           <label htmlFor="ste-obs" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
-            Descripción <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
+            Observación <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
           </label>
           <textarea id="ste-obs" value={observation} onChange={e => setObservation(e.target.value)} rows={2} className={cn(inputCls, 'w-full resize-none')} />
         </div>
@@ -229,7 +238,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
-          <button type="submit" disabled={saving} className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}>
+          <button type="submit" disabled={saving || !label.trim()} className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}>
             {saving ? 'Enviando…' : willUpdateExpense ? 'Actualizar egreso' : 'Enviar a egreso'}
           </button>
         </div>
