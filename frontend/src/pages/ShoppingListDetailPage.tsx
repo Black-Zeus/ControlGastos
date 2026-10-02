@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Trash2, Plus, RotateCcw, Pencil, Check, Repeat, Send,
 } from 'lucide-react'
@@ -312,6 +312,8 @@ type ModalState =
 export function ShoppingListDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  // Si se llegó desde otra vista (p. ej. el borrador de la lista en Egresos), "Volver" regresa ahí.
+  const backTo = (useLocation().state as { from?: string } | null)?.from ?? '/listas-compra'
   const { user } = useAuth()
   const currency = user?.currency ?? 'CRC'
   const userName = user?.name ?? ''
@@ -521,7 +523,7 @@ export function ShoppingListDetailPage() {
       </KpiGrid>
 
       <div className="flex justify-end gap-2">
-        <button onClick={() => navigate('/listas-compra')} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
+        <button onClick={() => navigate(backTo)} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
           <ArrowLeft size={14} /> Volver
         </button>
         <button onClick={() => setModal({ type: 'reset' })} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
@@ -602,7 +604,7 @@ export function ShoppingListDetailPage() {
           onClose={() => setModal(null)}
           onSuccess={async outcome => {
             setModal(null)
-            if (outcome === 'deleted') navigate('/listas-compra')
+            if (outcome === 'deleted') navigate(backTo)
             else await load()
           }}
         />

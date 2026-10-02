@@ -1416,7 +1416,7 @@ export function ExpensesPage() {
     {
       icon: Pencil, label: 'Editar lista', primary: true,
       hidden: e => !isListDraft(e),
-      onClick: e => navigate(`/listas-compra/${e.shopping_list_id}`),
+      onClick: e => navigate(`/listas-compra/${e.shopping_list_id}`, { state: { from: '/egresos' } }),
     },
     ...expenseActions.map(a => ({ ...a, hidden: (e: Expense) => isListDraft(e) || !!a.hidden?.(e) })),
   ]
