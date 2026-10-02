@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from './Sidebar'
 import { useSidebar } from '@/hooks/useSidebar'
 import { ScrollToTopButton } from '@/components/ScrollToTopButton'
+import logoUrl from '@/assets/logo.png'
 
 export function AppLayout() {
   const { collapsed, toggleCollapsed, mobileOpen, openMobile, closeMobile } = useSidebar()
@@ -21,24 +22,28 @@ export function AppLayout() {
         onCloseMobile={closeMobile}
       />
 
-      {/* Botón hamburger flotante — solo mobile, cuando el drawer está cerrado */}
-      {!mobileOpen && (
-        <button
-          onClick={openMobile}
-          aria-label="Abrir menú"
-          className="fixed top-3 left-3 z-[25] flex items-center justify-center rounded-xl border border-gray-100 bg-white p-2 shadow-md dark:border-slate-800 dark:bg-slate-900 lg:hidden"
-        >
-          <Menu size={18} className="text-gray-600 dark:text-slate-300" />
-        </button>
-      )}
-
       <div
         className={cn(
           'flex min-h-screen flex-col transition-[margin-left] duration-250',
           collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
       >
-        <main className="flex-1 p-4 sm:p-6">
+        {/* Topbar mobile: reserva su propio espacio, así el ☰ nunca tapa el título de la vista */}
+        <header className="sticky top-0 z-[25] flex h-14 items-center gap-3 border-b border-gray-100 bg-white/90 px-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90 lg:hidden">
+          <button
+            onClick={openMobile}
+            aria-label="Abrir menú"
+            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <Menu size={20} />
+          </button>
+          <div className="flex min-w-0 items-center gap-2">
+            <img src={logoUrl} alt="" className="h-6 w-6 shrink-0 rounded-lg object-cover" />
+            <span className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">ControlGastos</span>
+          </div>
+        </header>
+
+        <main className="min-w-0 flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
