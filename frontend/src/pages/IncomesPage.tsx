@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Unlock, AlertTriangle, CalendarRange, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Unlock, AlertTriangle, CalendarRange, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -14,7 +14,8 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
-import { KpiGrid } from '@/components/ui/Grids'
+import { FormGrid, KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -35,33 +36,6 @@ function PaymentStatusBadge({ status }: { status: 'recibido' | 'pendiente' }) {
   return status === 'recibido'
     ? <span className="inline-flex rounded-full bg-green-50 dark:bg-green-900/20 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-300">Recibido</span>
     : <span className="inline-flex rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">Pendiente</span>
-}
-
-function Modal({ title, onClose, children, size = 'md' }: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-  size?: 'md' | 'lg' | 'xl' | '2xl'
-}) {
-  const maxW = { md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-5xl' }[size]
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative w-full rounded-2xl bg-white dark:bg-slate-900 shadow-xl my-auto', maxW)}>
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  )
 }
 
 function PeriodIndicator({ openPeriod }: { openPeriod: Period | null }) {
@@ -188,7 +162,7 @@ function IncomeForm({ initial, incomeTypes, openPeriod, amountStep = '0.01', cur
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_220px]">
         <div className="space-y-4">
           <PeriodIndicator openPeriod={openPeriod} />
-          <div className="grid grid-cols-2 gap-4">
+          <FormGrid>
             <div>
               <label className={labelCls}>Fecha <span className="text-red-500">*</span></label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} required min={dateMin} max={dateMax} className={inputCls} />
@@ -207,7 +181,7 @@ function IncomeForm({ initial, incomeTypes, openPeriod, amountStep = '0.01', cur
                 className={inputCls}
               />
             </div>
-          </div>
+          </FormGrid>
 
           <div>
             <div className="mb-1.5 flex items-center justify-between">

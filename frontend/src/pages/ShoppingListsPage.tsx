@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, Copy, Archive, ArchiveRestore, Trash2, X, RefreshCw, Send } from 'lucide-react'
+import { Plus, FolderOpen, Copy, Archive, ArchiveRestore, Trash2, RefreshCw, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   userApi,
@@ -11,29 +11,7 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { KpiGrid } from '@/components/ui/Grids'
-
-// ─── Modal genérico (mismo patrón que CatalogsPage/ExpensesPage) ──────────────
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  )
-}
+import { Modal } from '@/components/ui/Modal'
 
 function Field({ label, id, placeholder, required, value, onChange }: {
   label: string; id: string; placeholder?: string
@@ -305,7 +283,7 @@ export function ShoppingListsPage() {
       />
 
       {modal?.type === 'create' && (
-        <Modal title="Nueva lista de compra" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Nueva lista de compra" onClose={() => setModal(null)}>
           <CreateForm
             categories={categories}
             onCancel={() => setModal(null)}
@@ -320,7 +298,7 @@ export function ShoppingListsPage() {
       )}
 
       {modal?.type === 'clone' && (
-        <Modal title="Clonar lista" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Clonar lista" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             Se creará una copia de <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.list.name}"</span> con
             los mismos productos, sin marcar ninguno como comprado.
@@ -347,7 +325,7 @@ export function ShoppingListsPage() {
       )}
 
       {modal?.type === 'archive' && (
-        <Modal title={modal.list.archived ? 'Desarchivar lista' : 'Archivar lista'} onClose={() => setModal(null)}>
+        <Modal size="sm" title={modal.list.archived ? 'Desarchivar lista' : 'Archivar lista'} onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             {modal.list.archived
               ? <>¿Desarchivar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.list.name}"</span>? Volverá a aparecer entre las listas activas.</>
@@ -364,7 +342,7 @@ export function ShoppingListsPage() {
       )}
 
       {modal?.type === 'delete' && (
-        <Modal title="Eliminar lista" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Eliminar lista" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 dark:text-slate-400">
             ¿Eliminar <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.list.name}"</span>?
             Los egresos que ya generó esta lista no se ven afectados.

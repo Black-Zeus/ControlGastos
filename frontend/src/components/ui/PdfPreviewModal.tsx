@@ -23,11 +23,8 @@ export function PdfPreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-[10vh_10vw]">
-      <div
-        className="flex flex-col rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-slate-900"
-        style={{ width: '80vw', height: '80vh' }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[10vh_10vw]">
+      <div className="flex h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[80vh] sm:w-[80vw]">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
