@@ -620,6 +620,8 @@ function ExpenseForm({
   // Desglose manual (no aplica a egresos de lista de compra: su desglose es el snapshot de la lista)
   // Ítems de lista de compra: congelados (ni desglose manual ni cambio de monto), aunque la lista ya no exista.
   const itemsLocked = !!initial?.items_from_list
+  // Desglose de lista: no se edita, pero se muestra de solo lectura bajo el adjunto.
+  const lockedItems = itemsLocked ? (initial?.items ?? []) : []
   const canBreakdown = !shoppingListId && !itemsLocked
   const [items, setItems] = useState<ExpenseItem[]>(
     () => (initial?.items ?? []).map(i => ({ label: i.label, amount: fmtAmountInput(i.amount, amountStep) })),
@@ -759,7 +761,7 @@ function ExpenseForm({
   return (
     <>
     <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_220px]">
+      <div className={cn('grid grid-cols-1 gap-6', lockedItems.length > 0 ? 'sm:grid-cols-[1fr_300px]' : 'sm:grid-cols-[1fr_220px]')}>
 
         {/* Columna izquierda: Fecha → Monto → Categoría → Descripción → Responsable|Obviable → Estado pago */}
         <div className="space-y-4">
@@ -1024,6 +1026,42 @@ function ExpenseForm({
             onNewPendingFile={handleOcrAttach}
             isListEvidence={itemsLocked}
           />
+
+          {lockedItems.length > 0 && (
+            <div className="mt-5 border-t border-gray-100 pt-4 dark:border-slate-800">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-slate-300">
+                <ListTree size={14} /> Desglose
+                <span className="text-xs font-normal text-gray-400 dark:text-slate-500">({lockedItems.length})</span>
+              </p>
+              <ul className="max-h-64 divide-y divide-gray-50 overflow-y-auto dark:divide-slate-800">
+                {lockedItems.map((it, i) => (
+                  <li key={i} className="flex items-start justify-between gap-3 py-1.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="break-words text-gray-700 dark:text-slate-300">
+                        {it.label}
+                        {it.obviable && <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">obviable</span>}
+                      </p>
+                      {it.quantity && it.unit_price && (
+                        <p className="text-[11px] text-gray-400 dark:text-slate-500">
+                          {Number(it.quantity).toLocaleString('es-CL')} × {fmtMoney(Number(it.unit_price), currency)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="shrink-0 whitespace-nowrap font-medium tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(Number(it.amount), currency)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex justify-between border-t border-gray-100 pt-2 text-sm dark:border-slate-800">
+                <span className="text-gray-500 dark:text-slate-400">Total</span>
+                <span className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+                  {fmtMoney(lockedItems.reduce((sum, it) => sum + Number(it.amount), 0), currency)}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-gray-400 dark:text-slate-500">
+                Viene de una lista de compra y no se edita aquí. Para corregirlo usa "Devolver a lista de compra" en el menú ⋯ del egreso.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

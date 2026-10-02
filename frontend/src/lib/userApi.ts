@@ -129,6 +129,10 @@ export interface Expense {
 export interface ExpenseItem {
   label: string
   amount: string
+  /** Solo en desgloses de lista de compra (congelados al enviar). */
+  quantity?: string
+  unit_price?: string
+  obviable?: boolean
 }
 
 export interface AttachmentOut {
