@@ -16,6 +16,7 @@ import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
+import { toLocalISODate } from '@/lib/dateRange'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -82,7 +83,7 @@ function periodDateRange(p: Period | null) {
 }
 
 function IncomeForm({ initial, incomeTypes, openPeriod, amountStep = '0.01', currency: _currency, onSubmit, onCancel }: IncomeFormProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toLocalISODate(new Date())
   const { min: dateMin, max: dateMax } = periodDateRange(openPeriod)
   const [date, setDate] = useState(initial?.date ?? today)
   const [label, setLabel] = useState(initial?.label ?? '')
