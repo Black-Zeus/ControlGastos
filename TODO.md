@@ -4,7 +4,7 @@ Registro de funcionalidades pendientes y propuestas.
 
 ---
 
-## [EN PROGRESO] Optimización UI mobile — rama `fix/ui-mobile`
+## [EN PROGRESO] Optimización UI mobile — vistas de usuario mergeadas en `main`
 
 Especificación en `optimizacion_ui_mobile.md` (raíz). Breakpoint único: `sm` (640 px) de Tailwind;
 todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
@@ -28,7 +28,6 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
   en `AdminCategories`/`AdminUsers`/`AdminIncomeTypes`, tabla de `AdminSettingsPage` sin
   `ScrollTable`, grid de 3 columnas en `AdminIncomeTypesPage`.
 - Revisión visual completa en 320/360/375/390/412/430/480/768 px y desktop antes de mergear.
-- Decidir si `optimizacion_ui_mobile.md` se versiona o se elimina al cerrar la rama.
 - `npm run lint` no funciona: `eslint` no está en las dependencias del frontend.
 
 ---
