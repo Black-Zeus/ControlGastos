@@ -208,6 +208,8 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
       .then(b => { url = URL.createObjectURL(b); setThumbUrl(url) })
       .catch(() => {})
     return () => { if (url) URL.revokeObjectURL(url) }
+    // Depende del id del adjunto, no del objeto: evita re-descargar la miniatura en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploaded?.id, expenseId])
 
   function pickFile(rawFile: File | null) {
@@ -1345,7 +1347,7 @@ export function ExpensesPage() {
               const created = await userApi.expenses.create(data)
               let attCount = 0
               if (pendingFile) {
-                try { await userApi.attachments.upload(created.id, pendingFile); attCount++ } catch {}
+                try { await userApi.attachments.upload(created.id, pendingFile); attCount++ } catch { /* el egreso ya se creó; el adjunto puede subirse después */ }
               }
               setExpenses(prev => [{ ...created, attachment_count: attCount }, ...prev])
               setModal(null)

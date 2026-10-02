@@ -287,7 +287,6 @@ export function AdminTokensPage() {
   }
 
   function handleCreated(newToken: IngestionToken) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { token: _raw, ...clean } = newToken as IngestionToken & { token: string }
     setTokens(prev => [clean, ...prev])
   }

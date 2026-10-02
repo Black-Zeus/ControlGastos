@@ -148,7 +148,7 @@ export function ReporteComparacionPage() {
         return { label: r.label, va, vb, delta: d, delta_pct, higher_is_better: r.higherIsBetter }
       })
       const chart_svg = _extractChartSvg(chartRef.current)
-      const safeLabel = (s: string) => s.replace(/[^\w\-]/g, '_')
+      const safeLabel = (s: string) => s.replace(/[^\w-]/g, '_')
       const res = await fetch(`${API_BASE}/v1/reports/pdf/comparacion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken()}` },
@@ -185,8 +185,9 @@ export function ReporteComparacionPage() {
       for (const e of expenses) {
         const cur = map.get(e.category_name) ?? { sA: 0, pA: 0, sB: 0, pB: 0 }
         const amt = parseFloat(e.amount)
-        if (side === 'A') { e.payment_status === 'saldado' ? (cur.sA += amt) : (cur.pA += amt) }
-        else              { e.payment_status === 'saldado' ? (cur.sB += amt) : (cur.pB += amt) }
+        const saldado = e.payment_status === 'saldado'
+        if (side === 'A') { if (saldado) cur.sA += amt; else cur.pA += amt }
+        else              { if (saldado) cur.sB += amt; else cur.pB += amt }
         map.set(e.category_name, cur)
       }
     }
