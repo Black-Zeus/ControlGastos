@@ -761,7 +761,7 @@ function ExpenseForm({
   return (
     <>
     <form onSubmit={handleSubmit}>
-      <div className={cn('grid grid-cols-1 gap-6', lockedItems.length > 0 ? 'sm:grid-cols-[1fr_300px]' : 'sm:grid-cols-[1fr_220px]')}>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_300px]">
 
         {/* Columna izquierda: Fecha → Monto → Categoría → Descripción → Responsable|Obviable → Estado pago */}
         <div className="space-y-4">
