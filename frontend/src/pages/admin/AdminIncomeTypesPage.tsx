@@ -1,28 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, X } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type IncomeType, type IncomeTypePayload } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Formulario ───────────────────────────────────────────────────────────────
 
@@ -168,7 +153,7 @@ export function AdminIncomeTypesPage() {
       <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Tipos de ingreso</h1>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <KpiGrid cols={3}>
         {[
           { label: 'Total',    value: stats.total,    color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Activos',  value: stats.active,   color: 'text-primary-600 dark:text-primary-400' },
@@ -179,7 +164,7 @@ export function AdminIncomeTypesPage() {
             <p className={cn('mt-1 text-2xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       {/* Filtros + acción */}
       <FilterBar
@@ -201,7 +186,7 @@ export function AdminIncomeTypesPage() {
       />
 
       {modal?.type === 'create' && (
-        <Modal title="Nuevo tipo de ingreso" onClose={() => setModal(null)}>
+        <Modal size="sm" title="Nuevo tipo de ingreso" onClose={() => setModal(null)}>
           <IncomeTypeForm
             submitLabel="Crear"
             onCancel={() => setModal(null)}
@@ -214,7 +199,7 @@ export function AdminIncomeTypesPage() {
         </Modal>
       )}
       {modal?.type === 'edit' && (
-        <Modal title={`Editar — ${modal.it.name}`} onClose={() => setModal(null)}>
+        <Modal size="sm" title={`Editar — ${modal.it.name}`} onClose={() => setModal(null)}>
           <IncomeTypeForm
             initial={modal.it}
             submitLabel="Guardar"

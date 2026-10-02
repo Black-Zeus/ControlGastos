@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, X, Trash2, AlertTriangle, FolderOpen, FolderCheck, Eye, EyeOff } from 'lucide-react'
+import { Plus, Pencil, KeyRound, ShieldCheck, User as UserIcon, Trash2, AlertTriangle, FolderOpen, FolderCheck, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminApi, type User, type UserCreatePayload, type UserUpdatePayload } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { PasswordStrengthBar } from '@/components/PasswordStrengthBar'
+import { KpiGrid } from '@/components/ui/Grids'
+import { Modal } from '@/components/ui/Modal'
 
 function fmtLastLogin(iso: string | null): string {
   if (!iso) return 'Nunca'
@@ -40,23 +42,6 @@ function PeriodsBadge({ open, closed }: { open: number; closed: number }) {
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Campos de formulario ─────────────────────────────────────────────────────
 
@@ -281,7 +266,7 @@ export function AdminUsersPage() {
       <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Usuarios</h1>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',    value: stats.total,   color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Activos',  value: stats.active,  color: 'text-primary-600 dark:text-primary-400' },
@@ -293,7 +278,7 @@ export function AdminUsersPage() {
             <p className={cn('mt-1 text-2xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       {/* Alerta SMTP */}
       {smtpOk === false && (
@@ -361,7 +346,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   }
 
   return (
-    <Modal title="Nuevo usuario" onClose={onClose}>
+    <Modal size="sm" title="Nuevo usuario" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Nombre" id="c-name" value={name} onChange={setName} placeholder="Juan Pérez" required />
         <Field label="Email" id="c-email" type="email" value={email} onChange={setEmail} placeholder="juan@correo.com" required />
@@ -397,7 +382,7 @@ function EditModal({ user, onClose, onSaved }: { user: User; onClose: () => void
   }
 
   return (
-    <Modal title="Editar usuario" onClose={onClose}>
+    <Modal size="sm" title="Editar usuario" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Nombre" id="e-name" value={name} onChange={setName} required />
         <div>
@@ -443,7 +428,7 @@ function DeleteModal({ user, onClose, onDeleted }: { user: User; onClose: () => 
   }
 
   return (
-    <Modal title="Eliminar usuario" onClose={onClose}>
+    <Modal size="sm" title="Eliminar usuario" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-start gap-3 rounded-xl bg-red-50 dark:bg-red-900/20 p-4">
           <AlertTriangle size={18} className="shrink-0 text-red-500 mt-0.5" />
@@ -487,7 +472,7 @@ function PasswordModal({ user, onClose }: { user: User; onClose: () => void }) {
   }
 
   return (
-    <Modal title={`Contraseña — ${user.name}`} onClose={onClose}>
+    <Modal size="sm" title={`Contraseña — ${user.name}`} onClose={onClose}>
       {done ? (
         <div className="py-4 text-center">
           <p className="text-sm font-medium text-primary-600 dark:text-primary-400">Contraseña actualizada correctamente</p>
