@@ -143,7 +143,7 @@ El modelo de lista de compras en SQLite se diseña para convertirse en un egreso
 ## [EN PROGRESO] Integraciones — vinculación de canales (Telegram/WhatsApp vía n8n)
 
 Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/IntegrationsPage.tsx`
-(migración `315c19dda564`). **Aún no desplegado en producción.**
+(migración `315c19dda564`). Mergeado en `main`; **aún no desplegado en producción.**
 
 ### ~~Autenticar a n8n en la ingesta por canal~~ — resuelto
 
@@ -166,6 +166,9 @@ Implementado en `backend/app/routers/channels.py` + `frontend/src/pages/Integrat
   tipos sí se verificaron con `tsc -b`).
 - Probar end-to-end con n8n real en dev. Contra la API ya se probó con curl: código →
   `POST /channels/link` → recibo con headers de canal (401 sin clave o con clave errónea).
+- Revisar en el navegador lo que entró con la rama: `/integraciones` (generar código, ver el
+  vínculo, desvincular), el menú agrupado de `/admin` expandido/colapsado en desktop y mobile, y
+  que las imágenes de las guías carguen en `/ayuda`.
 
 ---
 
@@ -276,32 +279,3 @@ contra una DB ya migrada** (falla con `Can't locate revision`). Un rollback real
 `pre-<versión>` + `git checkout` del commit previo + restaurar el `pg_dump`. Documentar el
 procedimiento de despliegue (respaldo → build → stop → migrar → verificar) en el README o en un
 script, y evaluar separar la migración del arranque del contenedor.
-
----
-
-## [PENDIENTE] Validar ramas antes de merge o descarte (2026-10-01)
-
-Ramas locales creadas tras el despliegue 0.3.0, aún **sin push**. Validar cada commit y decidir
-merge a `main` o descarte. Las dos ramas no tienen conflictos entre sí (verificado con
-`git merge-tree`).
-
-### ~~Rama `fix/numpy-cpu-produccion`~~ — mergeada en `main` (`bfa7ba3`)
-
-Queda pendiente solo la verificación en el CT108 (`docker compose ... build backend` y el import de
-`numpy, pandas, pytesseract`), descrita en "Operación de producción".
-
-### Rama `feature/integraciones-canales` — recomendación: no mergear hasta resolver el bloqueante
-
-> Nota dev: la DB de desarrollo ya tiene aplicada su migración `315c19dda564`; las ramas que no la
-> incluyen fallan al arrancar el backend (`Can't locate revision`). Mientras tanto, copiar el archivo
-> de migración sin versionarlo o hacer `alembic downgrade` desde esta rama.
-
-| Commit | Qué validar | Criterio |
-|---|---|---|
-| `61cc7ff` feat(backend): vinculación de canales | En dev: `alembic upgrade head` aplica `315c19dda564` sobre `8f656be3110f` y `alembic downgrade -1` revierte limpio. Flujo completo: `POST /channels/link-codes` → `POST /channels/link` → `POST /ingestion/receipts` con `X-Channel`/`X-Channel-Id`. El Bearer clásico sigue funcionando. | **Bloqueante:** antes de mergear, agregar un secreto compartido con n8n (ver sección Integraciones en esta rama). Sin eso, descartar o dejar la rama en espera. |
-| `c3305fa` feat(frontend): página Integraciones | `npm run build` y `npm run lint` sin errores (no se corrieron al commitear). Generar código, ver cómo se detecta el vínculo y desvincular. | Merge junto con `61cc7ff`; no tiene sentido sin el backend. |
-| `6f2dcd3` refactor(admin): menú agrupado del admin | Navegar `/admin` expandido y colapsado, en desktop y móvil; la ruta activa se marca bien. | Independiente de canales: se puede pasar a `main` aparte (`git cherry-pick`) aunque se descarte el resto. |
-| `c5e2764` docs(frontend): guías de Ayuda | Las imágenes cargan en `/ayuda`. La guía de canales solo tiene sentido si se mergea la feature. | La parte de responsable/obviable aplica ya; si se descarta canales, separar la guía 10 y su FAQ antes de mergear. |
-| `ca6ce8d` docs: TODO de seguridad de canales | — | Merge con la rama. |
-
----
