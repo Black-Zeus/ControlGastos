@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree,
+  Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
   FileText, Upload, Eye, RefreshCw, ShoppingCart,
 } from 'lucide-react'
@@ -10,10 +10,12 @@ import {
   userApi, authToken,
   type Expense, type AttachmentOut, type ShoppingList,
   type ExpenseCreatePayload, type ExpenseUpdatePayload, type ExpenseItem,
-  type UserCategory, type Period, type OcrPreview,
+  type UserCategory, type Period, type OcrPreview, type Income,
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter'
+import { EMPTY_RANGE, isInRange, isRangeActive, type DateRange } from '@/lib/dateRange'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
@@ -1085,6 +1087,8 @@ export function ExpensesPage() {
   const [ready, setReady] = useState(false)
 
   const [expenses, setExpenses]     = useState<Expense[]>([])
+  const [incomes, setIncomes]       = useState<Income[]>([])
+  const [range, setRange]           = useState<DateRange>(EMPTY_RANGE)
   const [categories, setCategories] = useState<UserCategory[]>([])
   const [allPeriods, setAllPeriods] = useState<Period[]>([])
   const [period, setPeriod]         = useState<Period | null>(null)
@@ -1107,12 +1111,14 @@ export function ExpensesPage() {
     if (!ready || year === null || month === null) return
     setLoading(true)
     try {
-      const [exps, cats, periods] = await Promise.all([
+      const [exps, incs, cats, periods] = await Promise.all([
         userApi.expenses.list(year, month),
+        userApi.incomes.list(year, month),
         userApi.categories.list(),
         userApi.periods.list(),
       ])
       setExpenses(exps)
+      setIncomes(incs)
       setCategories(cats)
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
@@ -1130,9 +1136,11 @@ export function ExpensesPage() {
   const isOpenPeriod = period?.status === 'abierto'
   const periodClosed = period?.status === 'cerrado'
 
-  function prevPeriod() { if (canGoPrev) { const p = allPeriods[periodIdx + 1]; setYear(p.year); setMonth(p.month) } }
-  function nextPeriod() { if (canGoNext) { const p = allPeriods[periodIdx - 1]; setYear(p.year); setMonth(p.month) } }
-  function jumpToOpenPeriod() { if (openPeriod) { setYear(openPeriod.year); setMonth(openPeriod.month) } }
+  // El rango de fechas es relativo al período visible: se limpia al cambiar de período.
+  function goToPeriod(p: { year: number; month: number }) { setYear(p.year); setMonth(p.month); setRange(EMPTY_RANGE) }
+  function prevPeriod() { if (canGoPrev) goToPeriod(allPeriods[periodIdx + 1]) }
+  function nextPeriod() { if (canGoNext) goToPeriod(allPeriods[periodIdx - 1]) }
+  function jumpToOpenPeriod() { if (openPeriod) goToPeriod(openPeriod) }
 
   const catOptions = useMemo(() =>
     categories.filter(c => c.active).map(c => ({ value: c.id, label: c.name })),
@@ -1171,8 +1179,9 @@ export function ExpensesPage() {
     if (filters.obviable === 'si' && !e.obviable) return false
     if (filters.obviable === 'no' && e.obviable)  return false
     if (filters.payment  && e.payment_status !== filters.payment)  return false
+    if (!isInRange(e.date, range)) return false
     return true
-  }), [expenses, filters])
+  }), [expenses, filters, range])
 
   // La tabla sigue mostrando los borradores (con su badge) para que el usuario
   // los revise, pero un borrador sin confirmar no cuenta en estos resúmenes —
@@ -1187,6 +1196,20 @@ export function ExpensesPage() {
   const montoPendiente = confirmed.filter(e => e.payment_status === 'pendiente').reduce((s, e) => s + Number(e.amount), 0)
   const montoSaldado   = confirmed.filter(e => e.payment_status === 'saldado').reduce((s, e) => s + Number(e.amount), 0)
   const obviableTotal  = confirmed.filter(e => e.obviable).reduce((s, e) => s + Number(e.amount), 0)
+
+  // Disponible = ingresos del período − todo lo ya pagado en el período − lo pendiente
+  // en la vista actual (rango + filtros). Responde "¿cuánto me queda si pago solo lo
+  // comprometido en estas fechas?". Ingresos con el mismo criterio que el Dashboard.
+  const ingresosPeriodo = incomes.reduce((s, i) => s + Number(i.amount), 0)
+  const pagadoPeriodo   = expenses
+    .filter(e => e.review_status !== 'borrador' && e.payment_status === 'saldado')
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const disponible      = ingresosPeriodo - pagadoPeriodo - montoPendiente
+  const periodBounds    = month !== null && year !== null
+    ? { min: `${year}-${String(month).padStart(2, '0')}-01`, max: `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}` }
+    : { min: undefined, max: undefined }
+  const rangeExceedsPeriod = isRangeActive(range) && !!periodBounds.min &&
+    ((!!range.from && range.from < periodBounds.min) || (!!range.to && range.to > periodBounds.max!))
 
   async function togglePayment(expense: Expense) {
     const next: 'pendiente' | 'saldado' = expense.payment_status === 'pendiente' ? 'saldado' : 'pendiente'
@@ -1371,13 +1394,55 @@ export function ExpensesPage() {
         </div>
       </div>
 
+      {/* Rango de fechas — filtra tabla y KPIs */}
+      <DateRangeFilter value={range} onChange={setRange} min={periodBounds.min} max={periodBounds.max} />
+      {rangeExceedsPeriod && (
+        <p className="-mt-2 text-xs text-gray-400 dark:text-slate-500">
+          El rango sale del período: solo se consideran los egresos de {MONTHS[month - 1]} {year}.
+        </p>
+      )}
+
       {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
       <KpiGrid cols={4}>
-        <KpiCard label="Total período"   amount={total}          currency={currency} count={confirmed.length} />
+        <KpiCard label={isRangeActive(range) ? 'Total en el rango' : 'Total período'} amount={total} currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
         <KpiCard label="Monto obviable"  amount={obviableTotal}  currency={currency} count={obviableCount}   color="text-primary-600 dark:text-primary-400" />
       </KpiGrid>
+
+      {/* Disponible pagando solo lo comprometido en la vista */}
+      <div className="rounded-2xl bg-white p-4 shadow-soft dark:bg-slate-900 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-slate-400">
+              <Wallet size={13} />
+              {isRangeActive(range)
+                ? `Disponible pagando lo pendiente ${range.from ? `del ${fmtDate(range.from)}` : ''} ${range.to ? `al ${fmtDate(range.to)}` : ''}`.replace(/\s+/g, ' ')
+                : 'Disponible pagando todo lo pendiente del período'}
+            </p>
+            <p className={cn(
+              'mt-1 break-words text-[clamp(1.25rem,6vw,1.5rem)] font-semibold leading-tight tabular-nums',
+              disponible >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
+            )}>
+              {fmtMoney(disponible, currency)}
+            </p>
+          </div>
+          <dl className="grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-3 lg:min-w-[480px] lg:gap-6">
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">Ingresos del período</dt>
+              <dd className="font-medium tabular-nums text-gray-800 dark:text-slate-200">{fmtMoney(ingresosPeriodo, currency)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">− Ya pagado (período)</dt>
+              <dd className="font-medium tabular-nums text-gray-800 dark:text-slate-200">{fmtMoney(pagadoPeriodo, currency)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 min-[420px]:block">
+              <dt className="text-xs text-gray-400 dark:text-slate-500">− Pendiente {isRangeActive(range) ? 'en el rango' : 'del período'}</dt>
+              <dd className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{fmtMoney(montoPendiente, currency)}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
 
       {draftCount > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-900/20 px-4 py-3">
@@ -1413,6 +1478,7 @@ export function ExpensesPage() {
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}
+        defaultSort={{ key: 'date', dir: 'asc' }}
         isExpandable={e => !!e.items && e.items.length > 0}
         renderExpanded={e => (
           <div className="max-w-xs space-y-1 pl-8">

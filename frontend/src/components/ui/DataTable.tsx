@@ -47,6 +47,8 @@ interface DataTableProps<T> {
   isExpandable?: (row: T) => boolean
   /** Contenido de la fila expandida (sub-tabla indentada, detalle, etc.), ocupa el ancho completo. */
   renderExpanded?: (row: T) => React.ReactNode
+  /** Orden inicial (el usuario puede cambiarlo haciendo clic en las cabeceras). */
+  defaultSort?: { key: string; dir: 'asc' | 'desc' }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,9 +136,10 @@ export function DataTable<T>({
   className,
   isExpandable,
   renderExpanded,
+  defaultSort,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey]   = useState<string | null>(null)
-  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('asc')
+  const [sortKey, setSortKey]   = useState<string | null>(defaultSort?.key ?? null)
+  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>(defaultSort?.dir ?? 'asc')
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(defaultPageSize)
   const [expanded, setExpanded] = useState<Set<string | number>>(new Set())
