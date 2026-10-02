@@ -110,12 +110,8 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
     if (!responsible && defaultResponsible) setResponsible(defaultResponsible)
   }, [defaultResponsible, responsible])
 
-  const unsentByTimestamp = list.items.filter(i => i.purchased && !i.sent_at)
-  const purchased = list.pending_send_count === unsentByTimestamp.length
-    ? unsentByTimestamp
-    : list.items.filter(i => i.purchased)
-  const alreadySentCount = Math.max(0, list.purchased_count - list.pending_send_count)
-  const willUpdateExpense = alreadySentCount > 0
+  // Cada envío crea un egreso nuevo con lo comprado aún no enviado.
+  const purchased = list.items.filter(i => i.purchased && !i.sent_at)
   const total = Number(list.pending_send_amount)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -179,16 +175,9 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
     <Modal size="sm" title="Enviar a egreso" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="rounded-xl bg-primary-50 dark:bg-primary-900/20 px-4 py-2.5 text-sm text-primary-700 dark:text-primary-400">
-          {willUpdateExpense ? 'Se actualizará el egreso existente agregando' : 'Se registrará un egreso de'}{' '}
-          <span className="font-semibold">{fmtMoney(total, currency)}</span> con
-          el detalle de {purchased.length} producto{purchased.length === 1 ? '' : 's'}. La lista no se modifica.
+          Se registrará un egreso nuevo de <span className="font-semibold">{fmtMoney(total, currency)}</span> con
+          el detalle de {purchased.length} producto{purchased.length === 1 ? '' : 's'} y un PDF de la lista como evidencia.
         </p>
-        {alreadySentCount > 0 && (
-          <p className="text-xs text-gray-400 dark:text-slate-500">
-            {alreadySentCount} producto{alreadySentCount === 1 ? '' : 's'} ya se incluyó en un envío anterior y no
-            se vuelve a cobrar; solo se agregará lo nuevo al egreso ya creado.
-          </p>
-        )}
 
         <div>
           <label htmlFor="ste-label" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -239,7 +228,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
           <button type="submit" disabled={saving || !label.trim()} className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}>
-            {saving ? 'Enviando…' : willUpdateExpense ? 'Actualizar egreso' : 'Enviar a egreso'}
+            {saving ? 'Enviando…' : 'Enviar a egreso'}
           </button>
         </div>
       </form>

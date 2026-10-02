@@ -28,7 +28,7 @@ from app.models.shopping_list import ShoppingList, ShoppingListItem
 from app.models.transaction import Attachment, Expense, PaymentStatus, ReviewStatus, TransactionSource
 from app.models.catalog import Category
 from app.models.period import Period, PeriodStatus
-from app.routers.expenses import _build_out as _build_expense_out, ExpenseOut
+from app.routers.expenses import _build_out as _build_expense_out, _assert_expense_editable, ExpenseOut
 from app.services.pdf_report import generate_pdf
 from app.services.pdf_shopping_list import EvidenceRow, build_shopping_list_evidence_html
 
@@ -160,18 +160,6 @@ async def _get_item_or_404(
     return item
 
 
-def _snapshot_key(item: ShoppingListItem) -> str:
-    return f"id:{item.id}"
-
-
-def _legacy_snapshot_key(item: ShoppingListItem) -> str:
-    return f"label:{item.label}"
-
-
-def _item_was_sent_in_current_period(item: ShoppingListItem, sent_keys: set[str]) -> bool:
-    return _snapshot_key(item) in sent_keys or _legacy_snapshot_key(item) in sent_keys
-
-
 def _build_item_snapshot(item: ShoppingListItem) -> dict:
     # quantity/unit_price/obviable congelados al enviar: la evidencia PDF no debe depender
     # del estado posterior de la lista (que puede reiniciarse o editarse).
@@ -185,14 +173,10 @@ def _build_item_snapshot(item: ShoppingListItem) -> dict:
     }
 
 
-def _build_list_out(
-    shopping_list: ShoppingList,
-    items: list[ShoppingListItem],
-    current_period_sent_item_ids: set[str] | None = None,
-) -> dict:
-    current_period_sent_item_ids = current_period_sent_item_ids or set()
+def _build_list_out(shopping_list: ShoppingList, items: list[ShoppingListItem]) -> dict:
     sent_dates = [i.sent_at for i in items if i.sent_at is not None]
-    pending = [i for i in items if i.purchased and not _item_was_sent_in_current_period(i, current_period_sent_item_ids)]
+    # Pendiente de enviar = comprado y aún no incluido en un envío (sent_at se limpia al reiniciar).
+    pending = [i for i in items if i.purchased and i.sent_at is None]
     return {
         "id":                  shopping_list.id,
         "name":                shopping_list.name,
@@ -209,44 +193,6 @@ def _build_list_out(
         "pending_send_amount": sum((i.quantity * (i.unit_price or 0) for i in pending), Decimal("0")),
         "pending_send_item_ids": [i.id for i in pending],
     }
-
-
-async def _sent_item_ids_for_open_period(
-    db: AsyncSession,
-    user_id: uuid.UUID,
-    list_ids: list[uuid.UUID],
-) -> dict[uuid.UUID, set[str]]:
-    open_period = (await db.execute(
-        select(Period).where(
-            Period.user_id == user_id,
-            Period.status == PeriodStatus.abierto,
-        )
-    )).scalar_one_or_none()
-    if not open_period or not list_ids:
-        return {}
-
-    expenses = (await db.execute(
-        select(Expense).where(
-            Expense.user_id == user_id,
-            Expense.period_id == open_period.id,
-            Expense.shopping_list_id.in_(list_ids),
-        )
-    )).scalars().all()
-
-    sent_by_list: dict[uuid.UUID, set[str]] = {}
-    for expense in expenses:
-        if not expense.shopping_list_id:
-            continue
-        ids = sent_by_list.setdefault(expense.shopping_list_id, set())
-        for item in expense.items or []:
-            if not isinstance(item, dict):
-                continue
-            item_id = item.get("id")
-            if item_id:
-                ids.add(f"id:{item_id}")
-            elif item.get("label"):
-                ids.add(f"label:{item['label']}")
-    return sent_by_list
 
 
 async def _load_items(db: AsyncSession, list_id: uuid.UUID) -> list[ShoppingListItem]:
@@ -284,9 +230,8 @@ async def list_shopping_lists(
     for item in rows:
         items_by_list.setdefault(item.shopping_list_id, []).append(item)
 
-    sent_by_list = await _sent_item_ids_for_open_period(db, current_user.id, list_ids)
     return [
-        _build_list_out(l, items_by_list.get(l.id, []), sent_by_list.get(l.id, set()))
+        _build_list_out(l, items_by_list.get(l.id, []))
         for l in lists
     ]
 
@@ -312,8 +257,7 @@ async def get_shopping_list(
 ):
     shopping_list = await _get_list_or_404(list_id, current_user.id, db)
     items = await _load_items(db, list_id)
-    sent_by_list = await _sent_item_ids_for_open_period(db, current_user.id, [list_id])
-    return _build_list_out(shopping_list, items, sent_by_list.get(list_id, set()))
+    return _build_list_out(shopping_list, items)
 
 
 @router.patch("/{list_id}", response_model=ShoppingListOut)
@@ -335,8 +279,7 @@ async def update_shopping_list(
     await db.commit()
     await db.refresh(shopping_list)
     items = await _load_items(db, list_id)
-    sent_by_list = await _sent_item_ids_for_open_period(db, current_user.id, [list_id])
-    return _build_list_out(shopping_list, items, sent_by_list.get(list_id, set()))
+    return _build_list_out(shopping_list, items)
 
 
 @router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -470,40 +413,20 @@ async def send_to_expense(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Crea un egreso con el monto y el detalle de los ítems marcados como comprados que
-    todavía no se hayan enviado (sent_at is null) — así reenviar la misma lista sin haberla
-    reiniciado no vuelve a cobrar los mismos productos dos veces. La lista en sí no cambia
-    de estado (purchased/unit_price siguen igual); solo se marca sent_at en los ítems
-    incluidos. Reiniciar la lista (POST /{list_id}/reset) limpia también sent_at."""
+    """Crea SIEMPRE un egreso nuevo (con su PDF de evidencia) con los ítems comprados que
+    aún no se enviaron (sent_at is null): una misma lista puede generar varios egresos en
+    el mes (p. ej. la feria de cada semana) y nunca modifica uno ya registrado. Los ítems
+    enviados quedan con sent_at; reiniciar la lista (POST /{list_id}/reset) lo limpia."""
     open_period = await _get_open_period(db, current_user.id)
     shopping_list = await _get_list_or_404(list_id, current_user.id, db)
     items = await _load_items(db, list_id)
 
-    existing_expense = (await db.execute(
-        select(Expense)
-        .where(
-            Expense.user_id == current_user.id,
-            Expense.period_id == open_period.id,
-            Expense.shopping_list_id == shopping_list.id,
-        )
-        .order_by(Expense.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
-    current_period_sent_item_ids = {
-        f"id:{item['id']}" if item.get("id") else f"label:{item['label']}"
-        for item in (existing_expense.items or [])
-        if isinstance(item, dict) and (item.get("id") or item.get("label"))
-    } if existing_expense else set()
-
-    purchased_items = [
-        i for i in items
-        if i.purchased and not _item_was_sent_in_current_period(i, current_period_sent_item_ids)
-    ]
+    purchased_items = [i for i in items if i.purchased and i.sent_at is None]
     if not purchased_items:
         raise HTTPException(
             status_code=400,
-            detail="No hay productos nuevos marcados como comprados para enviar. "
-                   "Si ya enviaste esta lista, reinícia los productos que quieras volver a comprar.",
+            detail="No hay productos marcados como comprados pendientes de enviar. "
+                   "Si ya enviaste esta lista, reiníciala para la próxima compra.",
         )
     if any(i.unit_price is None for i in purchased_items):
         raise HTTPException(
@@ -528,37 +451,23 @@ async def send_to_expense(
 
     amount = sum((i.quantity * i.unit_price for i in purchased_items), Decimal("0"))
     snapshot = [_build_item_snapshot(i) for i in purchased_items]
-    expense = existing_expense
-
-    if expense:
-        expense.date = body.date
-        expense.label = body.label or shopping_list.name
-        expense.category_id = category_id
-        expense.amount = expense.amount + amount
-        expense.items = [*(expense.items or []), *snapshot]
-        expense.items_from_list = True
-        expense.observation = body.observation
-        expense.responsible_tag = body.responsible_tag
-        expense.payment_status = PaymentStatus.saldado
-        expense.review_status = ReviewStatus.confirmado
-    else:
-        expense = Expense(
-            user_id=current_user.id,
-            period_id=open_period.id,
-            date=body.date,
-            label=body.label or shopping_list.name,
-            category_id=category_id,
-            amount=amount,
-            source=TransactionSource.web,
-            review_status=ReviewStatus.confirmado,
-            payment_status=PaymentStatus.saldado,
-            shopping_list_id=shopping_list.id,
-            items=snapshot,
-            items_from_list=True,
-            observation=body.observation,
-            responsible_tag=body.responsible_tag,
-        )
-        db.add(expense)
+    expense = Expense(
+        user_id=current_user.id,
+        period_id=open_period.id,
+        date=body.date,
+        label=body.label or shopping_list.name,
+        category_id=category_id,
+        amount=amount,
+        source=TransactionSource.web,
+        review_status=ReviewStatus.confirmado,
+        payment_status=PaymentStatus.saldado,
+        shopping_list_id=shopping_list.id,
+        items=snapshot,
+        items_from_list=True,
+        observation=body.observation,
+        responsible_tag=body.responsible_tag,
+    )
+    db.add(expense)
     sent_at = datetime.utcnow()
     for item in purchased_items:
         item.sent_at = sent_at
@@ -578,9 +487,8 @@ async def _attach_list_evidence(
     user: User,
     sent_at: datetime,
 ) -> int:
-    """Genera el PDF de la lista y lo deja como adjunto único del egreso (reemplaza el
-    anterior, p. ej. el de un envío previo de la misma lista). Devuelve cuántos adjuntos
-    quedan en el egreso."""
+    """Genera el PDF de la lista y lo deja como adjunto único del egreso (si ya tuviera
+    uno, lo reemplaza). Devuelve cuántos adjuntos quedan en el egreso."""
     from app import storage
 
     # Solo datos del snapshot del egreso; los envíos anteriores a esta versión no guardaban
@@ -645,3 +553,68 @@ async def _attach_list_evidence(
         logger.exception("No se pudo generar el PDF de evidencia de la lista %s", shopping_list.id)
         await db.rollback()
         return 1 if existing else 0
+
+
+# ─── Devolver un egreso a lista de compra ─────────────────────────────────────
+
+@router.post("/from-expense/{expense_id}", response_model=ShoppingListOut, status_code=status.HTTP_201_CREATED)
+async def expense_to_shopping_list(
+    expense_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Convierte un egreso con desglose en una lista de compra nueva y elimina el egreso
+    (con su adjunto). Es la vía para corregir un desglose bloqueado: se edita la lista y
+    se vuelve a enviar, lo que genera un egreso nuevo con su PDF. Los ítems quedan
+    comprados con su cantidad y precio; los de desglose manual, con cantidad 1."""
+    from app import storage
+
+    expense = (await db.execute(
+        select(Expense).where(Expense.id == expense_id, Expense.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Egreso no encontrado")
+    await _assert_expense_editable(expense, db)
+    snapshot = [i for i in (expense.items or []) if isinstance(i, dict)]
+    if not snapshot:
+        raise HTTPException(status_code=400, detail="El egreso no tiene desglose para convertir en lista")
+
+    shopping_list = ShoppingList(
+        user_id=current_user.id,
+        name=expense.label[:150],
+        default_category_id=expense.category_id,
+        planned_date=expense.date,
+    )
+    db.add(shopping_list)
+    await db.flush()
+    for pos, snap in enumerate(snapshot):
+        amount = Decimal(str(snap.get("amount", "0")))
+        quantity = Decimal(str(snap["quantity"])) if snap.get("quantity") is not None else Decimal("1")
+        unit_price = Decimal(str(snap["unit_price"])) if snap.get("unit_price") is not None else amount
+        db.add(ShoppingListItem(
+            shopping_list_id=shopping_list.id,
+            label=str(snap.get("label", ""))[:255] or "Producto",
+            quantity=quantity,
+            unit_price=unit_price,
+            purchased=True,
+            obviable=bool(snap.get("obviable", False)),
+            position=pos,
+        ))
+
+    attachments = (await db.execute(
+        select(Attachment).where(Attachment.expense_id == expense.id)
+    )).scalars().all()
+    storage_keys = [a.storage_key for a in attachments]
+    await db.delete(expense)
+    await db.commit()
+
+    # Borrado de archivos best-effort: la base ya quedó consistente.
+    loop = asyncio.get_event_loop()
+    for key in storage_keys:
+        try:
+            await loop.run_in_executor(None, storage.delete_object, key)
+        except Exception:
+            logger.warning("No se pudo borrar el adjunto %s del egreso devuelto a lista", key)
+
+    await db.refresh(shopping_list)
+    return _build_list_out(shopping_list, await _load_items(db, shopping_list.id))

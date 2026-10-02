@@ -464,6 +464,8 @@ export const userApi = {
     clone:  (id: string, name?: string)                  => request<ShoppingList>(`/v1/shopping-lists/${id}/clone`, { method: 'POST', body: JSON.stringify({ name }) }),
     reset:  (id: string)                                 => request<ShoppingList>(`/v1/shopping-lists/${id}/reset`, { method: 'POST' }),
     sendToExpense: (id: string, body: SendToExpensePayload) => request<Expense>(`/v1/shopping-lists/${id}/send-to-expense`, { method: 'POST', body: JSON.stringify(body) }),
+    /** Convierte un egreso con desglose en una lista nueva y elimina el egreso (con su adjunto). */
+    fromExpense: (expenseId: string) => request<ShoppingList>(`/v1/shopping-lists/from-expense/${expenseId}`, { method: 'POST' }),
     items: {
       create: (listId: string, body: ShoppingListItemCreatePayload)                => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items`, { method: 'POST', body: JSON.stringify(body) }),
       update: (listId: string, itemId: string, body: ShoppingListItemUpdatePayload) => request<ShoppingListItem>(`/v1/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(body) }),

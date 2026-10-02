@@ -122,6 +122,12 @@ vía migración Alembic) — no agregar una columna paralela.
    compra", p. ej. 24/12 para Navidad) o hoy; solo se ve en el mes de esa fecha. "Editar" lleva a
    la lista. Al enviar se crea el egreso real y el modal obliga a elegir: dejar la lista como
    plantilla (reiniciar) o eliminarla.
+   - **Cada envío crea un egreso nuevo** (p. ej. la feria de cada semana) con un PDF de evidencia
+     (Gotenberg) como adjunto único; nunca modifica un egreso ya registrado. Un ítem enviado
+     (`sent_at`) no se reenvía hasta reiniciar la lista.
+   - Ítems y monto de esos egresos quedan bloqueados (`expenses.items_from_list`). Para
+     corregirlos: **"Devolver a lista de compra"** (`POST /shopping-lists/from-expense/{id}`) crea
+     una lista con los ítems comprados y elimina el egreso con su adjunto.
    - Pendiente evaluar: el egreso enviado se registra en el período abierto aunque la fecha de
      compra caiga en otro mes (mismo comportamiento que antes de esta función).
 

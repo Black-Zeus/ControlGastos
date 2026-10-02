@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw, ShoppingCart,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -1094,6 +1094,7 @@ type ModalState =
   | { type: 'confirm-draft'; expense: Expense }
   | { type: 'attachments'; expense: Expense; att?: AttachmentOut }
   | { type: 'shopping-list-preview'; listId: string }
+  | { type: 'to-list'; expense: Expense }
   | null
 
 type Filters = Record<string, string | string[]>
@@ -1288,6 +1289,14 @@ export function ExpensesPage() {
   const rangeExceedsPeriod = isRangeActive(range) && !!periodBounds.min &&
     ((!!range.from && range.from < periodBounds.min) || (!!range.to && range.to > periodBounds.max!))
 
+  async function handleToList(expense: Expense) {
+    try {
+      const list = await userApi.shoppingLists.fromExpense(expense.id)
+      setModal(null)
+      navigate(`/listas-compra/${list.id}`, { state: { from: '/egresos' } })
+    } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
+  }
+
   async function togglePayment(expense: Expense) {
     const next: 'pendiente' | 'saldado' = expense.payment_status === 'pendiente' ? 'saldado' : 'pendiente'
     try {
@@ -1425,6 +1434,13 @@ export function ExpensesPage() {
       label:    'Ver lista de compra',
       disabled: e => !e.shopping_list_id,
       onClick:  e => setModal({ type: 'shopping-list-preview', listId: e.shopping_list_id! }),
+    },
+    {
+      icon:     Undo2,
+      label:    'Devolver a lista de compra',
+      hidden:   e => !e.items?.length,
+      disabled: () => !!periodClosed,
+      onClick:  e => setModal({ type: 'to-list', expense: e }),
     },
     {
       icon: Trash2, label: 'Eliminar', variant: 'danger',
@@ -1664,6 +1680,26 @@ export function ExpensesPage() {
           <div className="mt-5 flex gap-3">
             <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
             <button onClick={() => handleDelete(modal.expense)} className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors">Eliminar</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'to-list' && (
+        <Modal size="sm" title="Devolver a lista de compra" onClose={() => setModal(null)}>
+          <div className="space-y-3 text-sm text-gray-600 dark:text-slate-400">
+            <p>
+              Se creará una lista de compra <span className="font-semibold text-gray-900 dark:text-slate-100">"{modal.expense.label}"</span> con
+              los {modal.expense.items?.length ?? 0} productos del desglose, ya marcados como comprados, para que puedas corregirlos y volver a enviarla.
+            </p>
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              El egreso de {fmtMoney(Number(modal.expense.amount), currency)} se eliminará
+              {modal.expense.attachment_count > 0 && <> junto con su adjunto (la evidencia o la boleta que tenga)</>}.
+              Al reenviar la lista se generará un egreso nuevo con su PDF.
+            </p>
+          </div>
+          <div className="mt-5 flex gap-3">
+            <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+            <button onClick={() => handleToList(modal.expense)} className="flex-1 rounded-xl bg-primary-500 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition-colors">Devolver a lista</button>
           </div>
         </Modal>
       )}
