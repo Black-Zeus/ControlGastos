@@ -10,6 +10,7 @@ import { DataTable, type Column, type RowAction } from '@/components/ui/DataTabl
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { KpiGrid } from '@/components/ui/Grids'
 
 // ─── Modal genérico (mismo patrón que CatalogsPage/ExpensesPage) ──────────────
 
@@ -269,7 +270,7 @@ export function ShoppingListsPage() {
     <div className="space-y-5">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Listas de compra</h1>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Listas',                value: stats.total,     color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Productos',             value: stats.items,     color: 'text-gray-900 dark:text-slate-100' },
@@ -281,7 +282,7 @@ export function ShoppingListsPage() {
             <p className={cn('mt-1 text-xl font-semibold tabular-nums', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <FilterBar
         controls={FILTERS}

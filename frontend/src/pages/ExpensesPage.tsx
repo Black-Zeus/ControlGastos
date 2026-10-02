@@ -17,6 +17,7 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
+import { KpiGrid } from '@/components/ui/Grids'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1298,12 +1299,12 @@ export function ExpensesPage() {
       </div>
 
       {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <KpiCard label="Total período"   amount={total}          currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
         <KpiCard label="Monto obviable"  amount={obviableTotal}  currency={currency} count={obviableCount}   color="text-primary-600 dark:text-primary-400" />
-      </div>
+      </KpiGrid>
 
       {draftCount > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-900/20 px-4 py-3">

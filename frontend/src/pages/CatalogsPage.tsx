@@ -8,6 +8,7 @@ import {
 } from '@/lib/userApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
+import { KpiGrid } from '@/components/ui/Grids'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -280,7 +281,7 @@ function CategoriesTab() {
   return (
     <div className="space-y-4">
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',    value: stats.total,    color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Sistema',  value: stats.system,   color: 'text-gray-500 dark:text-slate-400' },
@@ -292,7 +293,7 @@ function CategoriesTab() {
             <p className={cn('mt-0.5 text-xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <FilterBar
         controls={CAT_FILTERS}
@@ -494,7 +495,7 @@ function IncomeTypesTab() {
   return (
     <div className="space-y-4">
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         {[
           { label: 'Total',    value: stats.total,    color: 'text-gray-900 dark:text-slate-100' },
           { label: 'Sistema',  value: stats.system,   color: 'text-gray-500 dark:text-slate-400' },
@@ -506,7 +507,7 @@ function IncomeTypesTab() {
             <p className={cn('mt-0.5 text-xl font-semibold', s.color)}>{s.value}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <FilterBar
         controls={IT_FILTERS}

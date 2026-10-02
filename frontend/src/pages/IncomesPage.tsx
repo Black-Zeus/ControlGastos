@@ -14,6 +14,7 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { KpiCard, fmtMoney } from '@/components/ui/KpiCard'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
+import { KpiGrid } from '@/components/ui/Grids'
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -468,11 +469,11 @@ export function IncomesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <KpiCard label="Total ingresos" amount={total}          currency={currency} count={incomeCount}     color="text-primary-600 dark:text-primary-400" />
         <KpiCard label="Recibidos"      amount={totalRecibidos}  currency={currency} count={recibidosCount}  color="text-green-600 dark:text-green-400" />
         <KpiCard label="Pendientes"     amount={totalPendientes} currency={currency} count={pendientesCount} color="text-amber-600 dark:text-amber-400" />
-      </div>
+      </KpiGrid>
 
       <FilterBar controls={FILTER_CONTROLS} values={filters} onChange={(k, v) => setFilters(f => ({ ...f, [k]: v }))} onClear={() => setFilters({ search: '', type: '' })} actions={[{ label: 'Nuevo ingreso', icon: Plus, onClick: () => setModal({ type: 'create' }) }]} />
 

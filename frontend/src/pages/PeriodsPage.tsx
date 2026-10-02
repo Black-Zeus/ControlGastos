@@ -8,6 +8,7 @@ import {
 import { userApi, Period, PeriodOpenOut } from '@/lib/userApi'
 import { cn } from '@/lib/utils'
 import { confirmedOnly } from '@/lib/reportUtils'
+import { KpiGrid } from '@/components/ui/Grids'
 
 interface LiveSummary {
   totalIngresos: number
@@ -61,9 +62,9 @@ function KpiCard({
         <Icon size={20} className={c.icon} />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-gray-500 dark:text-slate-400 truncate">{label}</p>
-        <p className={cn('text-xl font-bold tabular-nums', c.value)}>{value}</p>
-        {sub && <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{sub}</p>}
+        <p className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</p>
+        <p className={cn('break-words text-xl font-bold leading-tight tabular-nums', c.value)}>{value}</p>
+        {sub && <p className="text-xs text-gray-400 dark:text-slate-500">{sub}</p>}
       </div>
     </div>
   )
@@ -816,7 +817,7 @@ export function PeriodsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <KpiCard icon={CalendarRange} label="Total períodos"    value={String(periods.length)}                              color="blue" />
         <KpiCard icon={openPeriod ? Unlock : Lock} label="Período activo"
           value={openPeriod ? fmtPeriod(openPeriod.year, openPeriod.month) : 'Ninguno'}
@@ -826,7 +827,7 @@ export function PeriodsPage() {
         <KpiCard icon={Scale} label="Balance histórico"
           value={closedPeriods.length > 0 ? fmtMoney(totalBalance) : '—'}
           color={totalBalance >= 0 ? 'green' : 'red'} />
-      </div>
+      </KpiGrid>
 
       {/* Estado vacío / loading / error */}
       {loading && (

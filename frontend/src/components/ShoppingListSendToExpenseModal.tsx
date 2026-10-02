@@ -184,7 +184,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div>
           <label htmlFor="ste-resp" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
-            Responsable <span className="font-normal text-gray-400 dark:text-slate-500">(opcional)</span>
+            Responsable <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
           </label>
           <ResponsibleCombobox
             value={responsible}
@@ -195,7 +195,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div>
           <label htmlFor="ste-obs" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
-            Descripción <span className="font-normal text-gray-400 dark:text-slate-500">(opcional)</span>
+            Descripción <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
           </label>
           <textarea id="ste-obs" value={observation} onChange={e => setObservation(e.target.value)} rows={2} className={cn(inputCls, 'w-full resize-none')} />
         </div>

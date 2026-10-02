@@ -14,6 +14,7 @@ import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { ShoppingListSendToExpenseModal } from '@/components/ShoppingListSendToExpenseModal'
+import { KpiGrid } from '@/components/ui/Grids'
 
 // ─── Badge de estado de envío ──────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ function ItemFormModal({ title, submitLabel, currency, initial, onClose, onSubmi
           </div>
           <div className="min-w-0">
             <label htmlFor="if-price" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
-              Precio unitario <span className="font-normal text-gray-400 dark:text-slate-500">(opcional)</span>
+              Precio unitario <span className="hidden font-normal text-gray-400 dark:text-slate-500 sm:inline">(opcional)</span>
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -451,7 +452,7 @@ export function ShoppingListDetailPage() {
         <SentStatusBadge sent={wasSent} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiGrid cols={4}>
         <div className="rounded-2xl bg-white dark:bg-slate-900 p-4 shadow-soft">
           <p className="text-xs text-gray-500 dark:text-slate-400">Total productos</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900 dark:text-slate-100">{list.item_count}</p>
@@ -465,7 +466,7 @@ export function ShoppingListDetailPage() {
           <p className="mt-1 text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">{pendingCount}</p>
         </div>
         <KpiCard label="Total comprado" amount={purchasedTotal} currency={currency} color="text-primary-600 dark:text-primary-400" />
-      </div>
+      </KpiGrid>
 
       <div className="flex justify-end gap-2">
         <button onClick={() => navigate('/listas-compra')} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
