@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Trash2, Plus, RotateCcw, Pencil, Check, Repeat, Send,
@@ -85,7 +85,9 @@ function ItemUnitPriceCell({ item, currency, onChange }: {
   function commit(raw: string) {
     const parsed = parseAmountInput(raw, amountStep)
     setAmount(fmtAmountInput(parsed, amountStep))
-    onChange(parsed || '')
+    const current = item.unit_price == null ? '' : String(Number(item.unit_price))
+    const next = parsed ? String(Number(parsed)) : ''
+    if (next !== current) onChange(parsed || '')
   }
 
   return (
@@ -326,18 +328,38 @@ export function ShoppingListDetailPage() {
   const [modal, setModal] = useState<ModalState>(null)
   const [filters, setFilters] = useState<Record<string, string | string[]>>({ search: '', status: '' })
 
-  const load = useCallback(async () => {
+  // Solo la carga inicial muestra "Cargando…": los refrescos tras editar un producto son
+  // silenciosos para no desmontar la tabla (se perdían página, orden y posición). El contador
+  // descarta respuestas viejas cuando hay varias ediciones seguidas en vuelo.
+  const loadSeq = useRef(0)
+  const load = useCallback(async (silent = false) => {
     if (!id) return
-    setLoading(true)
+    const seq = ++loadSeq.current
+    if (!silent) setLoading(true)
     try {
       const [nextList, nextCategories] = await Promise.all([
         userApi.shoppingLists.get(id),
         userApi.categories.list(),
       ])
+      if (seq !== loadSeq.current) return
       setList(nextList)
       setCategories(nextCategories)
-    } finally { setLoading(false) }
+    } finally { if (!silent) setLoading(false) }
   }, [id])
+
+  const refresh = useCallback(() => load(true), [load])
+
+  /** Refleja el cambio del producto al instante y luego sincroniza los totales con el backend. */
+  async function patchItem(item: ShoppingListItem, data: Partial<Pick<ShoppingListItem, 'purchased' | 'unit_price' | 'quantity' | 'obviable'>>) {
+    if (!id) return
+    loadSeq.current++  // invalida cualquier refresco en vuelo con el estado anterior
+    setList(prev => prev && { ...prev, items: prev.items.map(i => i.id === item.id ? { ...i, ...data } : i) })
+    try {
+      await userApi.shoppingLists.items.update(id, item.id, data)
+    } finally {
+      await refresh()
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -345,58 +367,50 @@ export function ShoppingListDetailPage() {
     if (!id) return
     await userApi.shoppingLists.items.create(id, data)
     setModal(null)
-    await load()
+    await refresh()
   }
 
   async function updateItemForm(item: ShoppingListItem, data: ItemFormData) {
     if (!id) return
     await userApi.shoppingLists.items.update(id, item.id, data)
     setModal(null)
-    await load()
+    await refresh()
   }
 
-  async function toggleItem(item: ShoppingListItem) {
-    if (!id) return
-    await userApi.shoppingLists.items.update(id, item.id, { purchased: !item.purchased })
-    await load()
+  function toggleItem(item: ShoppingListItem) {
+    return patchItem(item, { purchased: !item.purchased })
   }
 
-  async function updateItemUnitPrice(item: ShoppingListItem, value: string) {
-    if (!id) return
-    await userApi.shoppingLists.items.update(id, item.id, { unit_price: value || null })
-    await load()
+  function updateItemUnitPrice(item: ShoppingListItem, value: string) {
+    return patchItem(item, { unit_price: value || null })
   }
 
-  async function updateItemQuantity(item: ShoppingListItem, value: string) {
-    if (!id) return
-    await userApi.shoppingLists.items.update(id, item.id, { quantity: value })
-    await load()
+  function updateItemQuantity(item: ShoppingListItem, value: string) {
+    return patchItem(item, { quantity: value })
   }
 
   async function deleteItem(item: ShoppingListItem) {
     if (!id) return
     await userApi.shoppingLists.items.delete(id, item.id)
-    await load()
+    await refresh()
   }
 
-  async function toggleItemObviable(item: ShoppingListItem) {
-    if (!id) return
-    await userApi.shoppingLists.items.update(id, item.id, { obviable: !item.obviable })
-    await load()
+  function toggleItemObviable(item: ShoppingListItem) {
+    return patchItem(item, { obviable: !item.obviable })
   }
 
   async function handleEditList(data: { name: string; planned_date: string | null }) {
     if (!id) return
     await userApi.shoppingLists.update(id, data)
     setModal(null)
-    await load()
+    await refresh()
   }
 
   async function handleReset() {
     if (!id) return
     await userApi.shoppingLists.reset(id)
     setModal(null)
-    await load()
+    await refresh()
   }
 
   if (loading || !list) {
@@ -555,6 +569,7 @@ export function ShoppingListDetailPage() {
         columns={columns}
         actions={itemActions}
         rowKey={item => item.id}
+        pageResetKey={JSON.stringify(filters)}
         emptyMessage={list.items.length === 0 ? 'Todavía no agregaste productos a esta lista.' : 'Ningún producto coincide con los filtros.'}
       />
 
@@ -607,7 +622,7 @@ export function ShoppingListDetailPage() {
           onSuccess={async outcome => {
             setModal(null)
             if (outcome === 'deleted') navigate(backTo)
-            else await load()
+            else await refresh()
           }}
         />
       )}

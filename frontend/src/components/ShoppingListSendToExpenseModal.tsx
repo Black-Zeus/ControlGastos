@@ -114,6 +114,8 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
   // Cada envío crea un egreso nuevo con lo comprado aún no enviado.
   const purchased = list.items.filter(i => i.purchased && !i.sent_at)
+  // El backend rechaza el envío si algún comprado no tiene valor: se avisa antes, con nombres.
+  const missingPrice = purchased.filter(i => i.unit_price == null || Number(i.unit_price) <= 0)
   const total = Number(list.pending_send_amount)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -181,6 +183,15 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
           el detalle de {purchased.length} producto{purchased.length === 1 ? '' : 's'} y un PDF de la lista como evidencia.
         </p>
 
+        {missingPrice.length > 0 && (
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+            Estos productos están marcados como comprados pero no tienen valor unitario. Complétalo o desmárcalos antes de enviar:
+            <ul className="mt-1 list-disc pl-5">
+              {missingPrice.map(i => <li key={i.id}>{i.label}</li>)}
+            </ul>
+          </div>
+        )}
+
         <div>
           <label htmlFor="ste-label" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
             Descripción <span className="text-red-500">*</span>
@@ -229,7 +240,7 @@ export function ShoppingListSendToExpenseModal({ list, categories, currency, def
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} className={cn(btnBase, 'border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800')}>Cancelar</button>
-          <button type="submit" disabled={saving || !label.trim()} className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}>
+          <button type="submit" disabled={saving || !label.trim() || missingPrice.length > 0} className={cn(btnBase, 'font-semibold bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60')}>
             {saving ? 'Enviando…' : 'Enviar a egreso'}
           </button>
         </div>
