@@ -5,6 +5,21 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
+## 0.4.4 — Desplegada el 2026-10-11
+
+Solo frontend, sin migraciones. Se recrea únicamente `frontend`; backend y workers reutilizan las
+imágenes anteriores reetiquetadas (el backend sigue reportando `0.4.2`).
+
+### Visor de adjuntos (Egresos)
+- Botón "Descargar" siempre visible. Si el navegador no puede mostrar el PDF embebido (Chrome en
+  Android), el aviso ofrece "Descargar PDF" en vez de quedar sin salida.
+- Se elimina el botón "Volver" y el listado de adjuntos: el visor muestra solo el adjunto del egreso.
+- Validación de seguridad: el backend ya restringía lista y descarga a egresos del usuario
+  (`Expense.user_id == current_user.id`). Prueba en dev con un usuario temporal: lista y descarga
+  de un adjunto ajeno → 404; sin token → 403; dueño → 200. No había exposición de datos.
+
+---
+
 ## 0.4.3 — Desplegada el 2026-10-11
 
 Solo frontend, sin migraciones (Alembic `99e116fc4116`). Se recrea únicamente `frontend`; backend
