@@ -408,7 +408,8 @@ function AttachmentViewerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-xl flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]">
+      {/* En vista previa: 70% del ancho (15% libre por lado) desde sm; en mobile, ancho completo. */}
+      <div className={cn('relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]', preview ? 'sm:w-[70vw] sm:max-w-none' : 'max-w-3xl')}>
 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-6 sm:py-4 shrink-0">
