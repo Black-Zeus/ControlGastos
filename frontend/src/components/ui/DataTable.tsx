@@ -57,6 +57,11 @@ interface DataTableProps<T> {
   selectable?: (row: T) => boolean
   selectedKeys?: Set<string | number>
   onSelectionChange?: (keys: Set<string | number>) => void
+  /**
+   * Si se provee, la página vuelve a 1 solo cuando cambia esta clave (p. ej. los filtros) y no
+   * con cada nuevo `data`: útil en tablas que se editan en línea y se refrescan tras cada cambio.
+   */
+  pageResetKey?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -172,6 +177,7 @@ export function DataTable<T>({
   selectable,
   selectedKeys,
   onSelectionChange,
+  pageResetKey,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey]   = useState<string | null>(defaultSort?.key ?? null)
   const [sortDir, setSortDir]   = useState<'asc' | 'desc'>(defaultSort?.dir ?? 'asc')
@@ -188,8 +194,9 @@ export function DataTable<T>({
     })
   }
 
-  // Resetear página cuando cambian los datos
-  useEffect(() => { setPage(1) }, [data, pageSize])
+  // Resetear página cuando cambian los datos (o la clave explícita, si se provee)
+  const resetTrigger = pageResetKey ?? data
+  useEffect(() => { setPage(1) }, [resetTrigger, pageSize])
 
   // ── Ordenar ──────────────────────────────────────────────────────────────
   const sorted = sortKey
