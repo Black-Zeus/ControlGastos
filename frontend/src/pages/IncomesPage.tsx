@@ -404,6 +404,25 @@ export function IncomesPage() {
     { key: 'amount', label: 'Monto', sortable: true, className: 'text-right', headerClassName: 'text-right', render: i => <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(Number(i.amount), currency)}</span> },
   ]
 
+  // Tarjeta para teléfono: descripción y monto arriba; fecha, tipo, responsable y estado abajo.
+  function renderIncomeCard(i: Income) {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 break-words font-medium text-gray-900 dark:text-slate-100">{i.label}</p>
+          <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(Number(i.amount), currency)}</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          {fmtDate(i.date)}{i.responsible_tag ? ` · ${i.responsible_tag}` : ''}
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <IncomeTypeBadge name={i.income_type_name} />
+          <PaymentStatusBadge status={i.payment_status} />
+        </div>
+      </div>
+    )
+  }
+
   async function handleDelete(income: Income) {
     try {
       await userApi.incomes.delete(income.id)
@@ -445,7 +464,7 @@ export function IncomesPage() {
         </div>
       </div>
 
-      <KpiGrid cols={4}>
+      <KpiGrid cols={4} compact>
         <KpiCard label="Total ingresos" amount={total}          currency={currency} count={incomeCount}     color="text-primary-600 dark:text-primary-400" />
         <KpiCard label="Recibidos"      amount={totalRecibidos}  currency={currency} count={recibidosCount}  color="text-green-600 dark:text-green-400" />
         <KpiCard label="Pendientes"     amount={totalPendientes} currency={currency} count={pendientesCount} color="text-amber-600 dark:text-amber-400" />
@@ -453,7 +472,7 @@ export function IncomesPage() {
 
       <FilterBar controls={FILTER_CONTROLS} values={filters} onChange={(k, v) => setFilters(f => ({ ...f, [k]: v }))} onClear={() => setFilters({ search: '', type: '' })} actions={[{ label: 'Nuevo ingreso', icon: Plus, onClick: () => setModal({ type: 'create' }) }]} />
 
-      <DataTable data={filtered} columns={columns} actions={actions} rowKey={i => i.id} loading={loading} pageResetKey={JSON.stringify([year, month, filters])} emptyMessage="No hay ingresos en este período" defaultPageSize={15} pageSizeOptions={[15, 30, 50]} />
+      <DataTable data={filtered} columns={columns} actions={actions} rowKey={i => i.id} loading={loading} pageResetKey={JSON.stringify([year, month, filters])} renderCard={renderIncomeCard} emptyMessage="No hay ingresos en este período" defaultPageSize={15} pageSizeOptions={[15, 30, 50]} />
 
       {modal?.type === 'create' && (
         <Modal title="Nuevo ingreso" onClose={() => setModal(null)} size="xl">

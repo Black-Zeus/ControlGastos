@@ -256,6 +256,41 @@ export function ShoppingListsPage() {
     },
   ]
 
+  // Tarjeta para teléfono: nombre (abre la lista) y monto comprado; barra de progreso; fechas y estado.
+  function renderListCard(l: ShoppingList) {
+    const amount = purchasedTotal(l.items)
+    const pct = l.item_count > 0 ? Math.round((l.purchased_count / l.item_count) * 100) : 0
+    return (
+      <div className="space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <button
+            onClick={() => navigate(`/listas-compra/${l.id}`)}
+            className="min-w-0 break-words text-left font-medium text-gray-900 hover:text-primary-600 dark:text-slate-100 dark:hover:text-primary-400"
+          >
+            {l.name}
+          </button>
+          <span className={cn('shrink-0 whitespace-nowrap tabular-nums', amount > 0 ? 'font-semibold text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-slate-500')}>
+            {amount > 0 ? fmtMoney(amount, currency) : '—'}
+          </span>
+        </div>
+        <div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-800">
+            <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+            {l.purchased_count} / {l.item_count} comprados
+            {l.planned_date && <> · Compra {fmtDate(l.planned_date)}</>}
+            {l.last_sent_at && <> · Enviada {fmtDate(l.last_sent_at)}</>}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ProcessingStatusBadge list={l} />
+          <ArchivedBadge archived={l.archived} />
+        </div>
+      </div>
+    )
+  }
+
   const actions: RowAction<ShoppingList>[] = [
     { icon: FolderOpen, label: 'Abrir', onClick: l => navigate(`/listas-compra/${l.id}`) },
     { icon: Copy, label: 'Clonar', onClick: l => setModal({ type: 'clone', list: l }) },
@@ -314,6 +349,7 @@ export function ShoppingListsPage() {
         columns={columns}
         actions={actions}
         rowKey={l => l.id}
+        renderCard={renderListCard}
         loading={loading}
         emptyMessage="No hay listas de compra que coincidan con los filtros"
       />

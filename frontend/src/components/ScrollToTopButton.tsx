@@ -33,7 +33,7 @@ export function ScrollToTopButton() {
       onClick={() => scrollTargetRef.current.scrollTo({ top: 0, behavior: 'smooth' })}
       aria-label="Volver arriba"
       title="Volver arriba"
-      className="fixed bottom-6 right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg transition-colors hover:bg-primary-600"
+      className="fixed bottom-24 right-4 z-40 sm:bottom-6 sm:right-6 flex h-10 w-10 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg transition-colors hover:bg-primary-600"
     >
       <ArrowUp size={18} />
     </button>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
-  ArrowLeft, Trash2, Plus, RotateCcw, Pencil, Check, Repeat, Send,
+  ArrowLeft, Trash2, Plus, RotateCcw, Pencil, Check, Repeat, Send, Minus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -46,7 +46,12 @@ function normalizeQuantity(value: string | number | null | undefined, fallback =
 
 // ─── Celdas editables de la tabla de productos ────────────────────────────────
 
-function ItemQuantityCell({ item, onChange }: { item: ShoppingListItem; onChange: (v: string) => void }) {
+function ItemQuantityCell({ item, onChange, stepper = false }: {
+  item: ShoppingListItem
+  onChange: (v: string) => void
+  /** Botones − / + grandes (tarjeta mobile). */
+  stepper?: boolean
+}) {
   const [value, setValue] = useState(() => normalizeQuantity(item.quantity))
 
   useEffect(() => { setValue(normalizeQuantity(item.quantity)) }, [item.quantity])
@@ -57,23 +62,42 @@ function ItemQuantityCell({ item, onChange }: { item: ShoppingListItem; onChange
     if (normalized !== normalizeQuantity(item.quantity)) onChange(normalized)
   }
 
-  return (
+  const input = (
     <input
       type="number"
       min="1"
       step="1"
+      inputMode="numeric"
+      aria-label="Cantidad"
       value={value}
       onChange={e => setValue(e.target.value)}
+      onFocus={e => e.currentTarget.select()}
       onBlur={e => commit(e.currentTarget.value)}
-      className={cn(inputCls, 'w-20 text-center')}
+      className={cn(inputCls, stepper ? 'h-9 w-12 px-1 text-center' : 'w-20 text-center')}
     />
+  )
+  if (!stepper) return input
+
+  const current = Number(normalizeQuantity(value))
+  const stepBtn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600 active:bg-gray-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:active:bg-slate-800'
+  return (
+    <div className="flex items-center gap-1">
+      <button type="button" aria-label="Restar uno" disabled={current <= 1} onClick={() => commit(String(current - 1))} className={stepBtn}>
+        <Minus size={16} />
+      </button>
+      {input}
+      <button type="button" aria-label="Sumar uno" onClick={() => commit(String(current + 1))} className={stepBtn}>
+        <Plus size={16} />
+      </button>
+    </div>
   )
 }
 
-function ItemUnitPriceCell({ item, currency, onChange }: {
+function ItemUnitPriceCell({ item, currency, onChange, className }: {
   item: ShoppingListItem
   currency: string
   onChange: (v: string) => void
+  className?: string
 }) {
   const amountStep = amountStepFor(currency)
   const [amount, setAmount] = useState(() => fmtAmountInput(item.unit_price ?? '', amountStep))
@@ -97,9 +121,10 @@ function ItemUnitPriceCell({ item, currency, onChange }: {
       placeholder={amountStep === '1' ? '0' : '0.00'}
       value={amount}
       onChange={e => setAmount(e.target.value)}
-      onFocus={e => setAmount(parseAmountInput(e.currentTarget.value, amountStep))}
+      aria-label="Valor unitario"
+      onFocus={e => { setAmount(parseAmountInput(e.currentTarget.value, amountStep)); const el = e.currentTarget; requestAnimationFrame(() => el.select()) }}
       onBlur={e => commit(e.currentTarget.value)}
-      className={cn(inputCls, 'w-28 text-center')}
+      className={cn(inputCls, 'text-center', className ?? 'w-28', item.purchased && !item.unit_price && 'border-amber-400 dark:border-amber-500')}
     />
   )
 }
@@ -492,6 +517,48 @@ export function ShoppingListDetailPage() {
     },
   ]
 
+  // Tarjeta para teléfono: check grande + nombre; cantidad con − / + y valor a mano; total.
+  function renderItemCard(item: ShoppingListItem) {
+    const total = item.unit_price ? Number(item.quantity) * Number(item.unit_price) : null
+    return (
+      <div className="space-y-2.5">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox" checked={item.purchased} onChange={() => toggleItem(item)}
+            aria-label={item.purchased ? 'Desmarcar comprado' : 'Marcar comprado'}
+            className="mt-0.5 h-6 w-6 shrink-0 rounded border-gray-300 text-primary-500 accent-primary-500 focus:ring-primary-400 dark:border-slate-600"
+          />
+          <span className="min-w-0 flex-1">
+            <span className={cn('block break-words font-medium', item.purchased ? 'text-gray-400 line-through dark:text-slate-500' : 'text-gray-900 dark:text-slate-100')}>
+              {item.label}
+            </span>
+            {item.observation && <span className="mt-0.5 block text-xs text-gray-500 dark:text-slate-400">{item.observation}</span>}
+            {(item.obviable || item.sent_at) && (
+              <span className="mt-1 flex flex-wrap gap-1.5">
+                {item.obviable && <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-slate-700 dark:text-slate-300">Obviable</span>}
+                {item.sent_at && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <Check size={9} /> Enviado
+                  </span>
+                )}
+              </span>
+            )}
+          </span>
+        </label>
+        <div className="flex items-center gap-2">
+          <ItemQuantityCell item={item} stepper onChange={v => updateItemQuantity(item, v)} />
+          <ItemUnitPriceCell item={item} currency={currency} className="h-9 min-w-0 flex-1" onChange={v => updateItemUnitPrice(item, v)} />
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          {item.purchased && !item.unit_price
+            ? <span className="text-xs text-amber-600 dark:text-amber-400">Falta el valor</span>
+            : <span />}
+          <span className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">{total !== null ? fmtMoney(total, currency) : '—'}</span>
+        </div>
+      </div>
+    )
+  }
+
   const itemActions: RowAction<ShoppingListItem>[] = [
     { icon: Pencil, label: 'Editar', onClick: item => setModal({ type: 'edit-item', item }) },
     {
@@ -525,6 +592,7 @@ export function ShoppingListDetailPage() {
         <SentStatusBadge sent={wasSent} />
       </div>
 
+      <div className="hidden sm:block">
       <KpiGrid cols={4}>
         <div className="rounded-2xl bg-white dark:bg-slate-900 p-4 shadow-soft">
           <p className="text-xs text-gray-500 dark:text-slate-400">Total productos</p>
@@ -540,8 +608,9 @@ export function ShoppingListDetailPage() {
         </div>
         <KpiCard label="Total comprado" amount={purchasedAmount} currency={currency} color="text-primary-600 dark:text-primary-400" />
       </KpiGrid>
+      </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button onClick={() => navigate(backTo)} className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800">
           <ArrowLeft size={14} /> Volver
         </button>
@@ -551,7 +620,7 @@ export function ShoppingListDetailPage() {
         <button
           onClick={() => setModal({ type: 'send' })}
           disabled={list.pending_send_count === 0}
-          className="flex items-center gap-1.5 rounded-xl bg-primary-500 px-3 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="hidden items-center gap-1.5 rounded-xl bg-primary-500 px-3 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60 sm:flex"
         >
           <Send size={14} /> Enviar a egreso
         </button>
@@ -573,8 +642,24 @@ export function ShoppingListDetailPage() {
         actions={itemActions}
         rowKey={item => item.id}
         pageResetKey={JSON.stringify(filters)}
+        renderCard={renderItemCard}
         emptyMessage={list.items.length === 0 ? 'Todavía no agregaste productos a esta lista.' : 'Ningún producto coincide con los filtros.'}
       />
+
+      {/* Barra inferior fija (mobile): progreso, total y envío siempre a mano */}
+      <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-between gap-3 border-t border-gray-100 bg-white/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 sm:hidden">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 dark:text-slate-400">{list.purchased_count} de {list.item_count} comprados</p>
+          <p className="font-semibold tabular-nums text-gray-900 dark:text-slate-100">{fmtMoney(purchasedAmount, currency)}</p>
+        </div>
+        <button
+          onClick={() => setModal({ type: 'send' })}
+          disabled={list.pending_send_count === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Send size={15} /> Enviar a egreso
+        </button>
+      </div>
 
       {modal?.type === 'add-item' && (
         <ItemFormModal
