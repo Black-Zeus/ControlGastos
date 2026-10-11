@@ -1215,7 +1215,7 @@ function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: s
 
   // Con observación: col 1 = tabla del desglose, col 2 = observación (apiladas en mobile).
   return (
-    <div className={cn('ml-6 grid gap-3', observation ? 'max-w-4xl lg:grid-cols-[minmax(0,1fr)_18rem]' : 'max-w-2xl')}>
+    <div className={cn('grid gap-3 sm:ml-6', observation ? 'max-w-4xl lg:grid-cols-[minmax(0,1fr)_18rem]' : 'max-w-2xl')}>
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-soft dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-slate-800">
           <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
@@ -1227,8 +1227,8 @@ function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: s
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-slate-500">
               <th className="px-4 py-1.5 text-left font-medium">Producto</th>
-              {hasQty && <th className="px-3 py-1.5 text-right font-medium">Cant.</th>}
-              {hasQty && <th className="px-3 py-1.5 text-right font-medium">P. unitario</th>}
+              {hasQty && <th className="hidden px-3 py-1.5 text-right font-medium sm:table-cell">Cant.</th>}
+              {hasQty && <th className="hidden px-3 py-1.5 text-right font-medium sm:table-cell">P. unitario</th>}
               <th className="px-4 py-1.5 text-right font-medium">Subtotal</th>
             </tr>
           </thead>
@@ -1240,14 +1240,19 @@ function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: s
                   {it.obviable && (
                     <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">obviable</span>
                   )}
+                  {hasQty && it.quantity && it.unit_price && (
+                    <span className="block text-[11px] tabular-nums text-gray-400 dark:text-slate-500 sm:hidden">
+                      {Number(it.quantity).toLocaleString('es-CL')} × {fmtMoney(Number(it.unit_price), currency)}
+                    </span>
+                  )}
                 </td>
                 {hasQty && (
-                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                  <td className="hidden whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400 sm:table-cell">
                     {it.quantity ? Number(it.quantity).toLocaleString('es-CL') : '—'}
                   </td>
                 )}
                 {hasQty && (
-                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                  <td className="hidden whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400 sm:table-cell">
                     {it.unit_price ? fmtMoney(Number(it.unit_price), currency) : '—'}
                   </td>
                 )}
@@ -1259,9 +1264,10 @@ function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: s
           </tbody>
           <tfoot>
             <tr className="border-t border-gray-200 dark:border-slate-700">
-              <td colSpan={hasQty ? 3 : 1} className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400">
+              <td className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400">
                 {obviableTotal > 0 && <>Incluye obviables: <span className="tabular-nums">{fmtMoney(obviableTotal, currency)}</span></>}
               </td>
+              {hasQty && <td colSpan={2} className="hidden sm:table-cell" />}
               <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-slate-100">
                 {fmtMoney(total, currency)}
               </td>
@@ -1547,6 +1553,44 @@ export function ExpensesPage() {
     },
   ]
 
+  // Tarjeta para teléfono: descripción y monto arriba; fecha, categoría y responsable abajo;
+  // estado de pago, tipo y marcas (borrador, obviable, adjunto) como chips.
+  function renderExpenseCard(e: Expense) {
+    const draft = isListDraft(e)
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-start justify-between gap-3">
+          {draft ? (
+            <p className="flex min-w-0 items-center gap-1.5 break-words font-medium italic text-gray-500 dark:text-slate-400">
+              <ShoppingCart size={13} className="shrink-0" /> {e.label}
+            </p>
+          ) : (
+            <p className="min-w-0 break-words font-medium text-gray-900 dark:text-slate-100">{e.label}</p>
+          )}
+          <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+            {fmtMoney(Number(e.amount), currency)}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          {fmtDate(e.date)} · {e.category_name}{e.responsible_tag ? ` · ${e.responsible_tag}` : ''}
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!draft && <PaymentBadge status={e.payment_status} />}
+          {!draft && e.review_status === 'borrador' && <DraftBadge />}
+          <TypeBadge type={e.category_type} />
+          {e.obviable && (
+            <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-slate-700 dark:text-slate-300">Obviable</span>
+          )}
+          {e.attachment_count > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+              <FileText size={10} /> Adjunto
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   async function toggleObviable(expense: Expense) {
     try {
       const updated = await userApi.expenses.update(expense.id, { obviable: !expense.obviable })
@@ -1682,7 +1726,7 @@ export function ExpensesPage() {
       )}
 
       {/* KPIs — excluyen borradores sin confirmar (ver DraftBadge en la tabla) */}
-      <KpiGrid cols={4}>
+      <KpiGrid cols={4} compact>
         <KpiCard label={isRangeActive(range) ? 'Total en el rango' : 'Total período'} amount={total} currency={currency} count={confirmed.length} />
         <KpiCard label="Monto saldado"   amount={montoSaldado}   currency={currency} count={saldadoCount}    color="text-green-600 dark:text-green-400" />
         <KpiCard label="Monto pendiente" amount={montoPendiente} currency={currency} count={pendingCount}    color="text-amber-600 dark:text-amber-400" />
@@ -1824,6 +1868,7 @@ export function ExpensesPage() {
         rowKey={e => e.id}
         loading={loading}
         pageResetKey={JSON.stringify([year, month, range, filters])}
+        renderCard={renderExpenseCard}
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}

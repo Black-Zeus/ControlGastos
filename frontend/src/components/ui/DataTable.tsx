@@ -64,6 +64,12 @@ interface DataTableProps<T> {
    * con cada nuevo `data`: útil en tablas que se editan en línea y se refrescan tras cada cambio.
    */
   pageResetKey?: string
+  /**
+   * Vista de tarjetas para teléfono (< sm): si se provee, en mobile se muestra una tarjeta por
+   * fila (sin scroll horizontal ni paginación) con el contenido que devuelve esta función; la
+   * tabla queda solo desde `sm`. El marco de la tarjeta agrega selección, acciones y detalle.
+   */
+  renderCard?: (row: T) => React.ReactNode
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -131,7 +137,7 @@ function SelectCheckbox({ checked, indeterminate = false, disabled = false, onCh
 
 // ─── Menú "⋯" de acciones secundarias ─────────────────────────────────────────
 
-function RowActionsMenu<T>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
+function RowActionsMenu<T>({ row, actions, large = false }: { row: T; actions: RowAction<T>[]; large?: boolean }) {
   if (actions.length === 0) return null
   return (
     <DropdownMenu.Root modal={false}>
@@ -139,9 +145,9 @@ function RowActionsMenu<T>({ row, actions }: { row: T; actions: RowAction<T>[] }
         <button
           title="Más acciones"
           aria-label="Más acciones"
-          className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:data-[state=open]:bg-slate-800"
+          className={cn(large ? 'flex h-9 w-9 items-center justify-center' : 'p-1.5', 'rounded-lg border border-gray-200 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-700 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:data-[state=open]:bg-slate-800')}
         >
-          <MoreHorizontal size={14} />
+          <MoreHorizontal size={large ? 16 : 14} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -196,6 +202,7 @@ export function DataTable<T>({
   selectedKeys,
   onSelectionChange,
   pageResetKey,
+  renderCard,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey]   = useState<string | null>(defaultSort?.key ?? null)
   const [sortDir, setSortDir]   = useState<'asc' | 'desc'>(defaultSort?.dir ?? 'asc')
@@ -215,6 +222,11 @@ export function DataTable<T>({
   // Resetear página cuando cambian los datos (o la clave explícita, si se provee)
   const resetTrigger = pageResetKey ?? data
   useEffect(() => { setPage(1) }, [resetTrigger, pageSize])
+
+  // Tarjetas (mobile): lista continua que crece de a MOBILE_STEP con "Mostrar más".
+  const MOBILE_STEP = 30
+  const [mobileLimit, setMobileLimit] = useState(MOBILE_STEP)
+  useEffect(() => { setMobileLimit(MOBILE_STEP) }, [resetTrigger])
 
   // ── Ordenar ──────────────────────────────────────────────────────────────
   const sortCol = sortKey ? columns.find(c => c.key === sortKey) : undefined
@@ -262,11 +274,152 @@ export function DataTable<T>({
   const extraCols = (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0) + (hasSelection ? 1 : 0)
   const useOverflowMenu = !!actions?.some(a => a.primary)
 
+  function renderActionButtons(row: T, large = false) {
+    return (
+      <>
+        {(useOverflowMenu ? actions!.filter(a => a.primary) : actions!).map((action, ai) => {
+          if (action.hidden?.(row)) return null
+          const { Icon, label, variant, disabled } = resolveAction(action, row)
+          return (
+            <button
+              key={ai}
+              onClick={() => !disabled && action.onClick(row)}
+              disabled={disabled}
+              title={label}
+              aria-label={label}
+              className={cn(
+                'rounded-lg border transition-colors',
+                large ? 'flex h-9 w-9 items-center justify-center' : 'p-1.5',
+                disabled
+                  ? 'cursor-not-allowed border-gray-200 dark:border-slate-700 text-gray-300 dark:text-slate-600'
+                  : variant === 'danger'
+                    ? 'border-red-200 dark:border-red-900/40 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20'
+                    : 'border-gray-200 dark:border-slate-700 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+              )}
+            >
+              <Icon size={large ? 16 : 14} />
+            </button>
+          )
+        })}
+        {useOverflowMenu && (
+          <RowActionsMenu row={row} actions={actions!.filter(a => !a.primary && !a.hidden?.(row))} large={large} />
+        )}
+      </>
+    )
+  }
+
+  const sortableCols = columns.filter(c => c.sortable)
+  const mobileRows = sorted.slice(0, mobileLimit)
+
   return (
     <div className={cn('flex flex-col gap-3', className)}>
 
+      {/* Tarjetas (solo mobile) */}
+      {renderCard && (
+        <div className="flex flex-col gap-2.5 sm:hidden">
+          {(sortableCols.length > 0 || hasSelection) && (
+            <div className="flex items-center gap-2">
+              {hasSelection && (
+                <label className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                  <SelectCheckbox
+                    checked={allSelected}
+                    indeterminate={selectedCount > 0 && !allSelected}
+                    disabled={selectableKeys.length === 0}
+                    onChange={toggleAll}
+                    label="Seleccionar todos"
+                  />
+                  {selectedCount > 0 ? `${selectedCount} sel.` : 'Todos'}
+                </label>
+              )}
+              {sortableCols.length > 0 && (
+                <>
+                  <select
+                    value={sortKey ?? ''}
+                    onChange={e => { setSortKey(e.target.value || null); setSortDir('asc') }}
+                    aria-label="Ordenar por"
+                    className="min-w-0 flex-1 rounded-xl border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary-400 dark:border-white dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Orden original</option>
+                    {sortableCols.map(c => <option key={c.key} value={c.key}>Ordenar: {c.label}</option>)}
+                  </select>
+                  <button
+                    onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                    disabled={!sortKey}
+                    aria-label={sortDir === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-gray-300 bg-white text-gray-500 disabled:opacity-40 dark:border-white dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    {sortDir === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {loading && mobileRows.length === 0 && (
+            <div className="flex justify-center py-10">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+            </div>
+          )}
+          {!loading && sorted.length === 0 && (
+            <p className="rounded-2xl bg-white py-10 text-center text-sm text-gray-400 shadow-soft dark:bg-slate-900 dark:text-slate-500">{emptyMessage}</p>
+          )}
+
+          {mobileRows.map(row => {
+            const key = rowKey(row)
+            const canExpand = renderExpanded && (!isExpandable || isExpandable(row))
+            const isOpen = canExpand && expanded.has(key)
+            const isSelected = hasSelection && selected.has(key)
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'rounded-2xl bg-white p-3 shadow-soft dark:bg-slate-900',
+                  isSelected && 'ring-2 ring-primary-400/60',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  {hasSelection && selectable!(row) && (
+                    <div className="pt-0.5">
+                      <SelectCheckbox checked={selected.has(key)} onChange={() => toggleRow(key)} label="Seleccionar" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">{renderCard(row)}</div>
+                </div>
+                {(hasActions || canExpand) && (
+                  <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5 dark:border-slate-800">
+                    {canExpand ? (
+                      <button
+                        onClick={() => toggleExpanded(key)}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                      >
+                        <ChevronRight size={14} className={cn('transition-transform', isOpen && 'rotate-90')} />
+                        {isOpen ? 'Ocultar detalle' : 'Ver detalle'}
+                      </button>
+                    ) : <span />}
+                    {hasActions && <div className="flex items-center gap-1.5">{renderActionButtons(row, true)}</div>}
+                  </div>
+                )}
+                {isOpen && <div className="mt-2.5 overflow-x-auto">{renderExpanded!(row)}</div>}
+              </div>
+            )
+          })}
+
+          {sorted.length > mobileRows.length && (
+            <button
+              onClick={() => setMobileLimit(n => n + MOBILE_STEP)}
+              className="rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            >
+              Mostrar más ({sorted.length - mobileRows.length} restantes)
+            </button>
+          )}
+          {sorted.length > 0 && (
+            <p className="text-center text-xs text-gray-400 dark:text-slate-500">{mobileRows.length} de {sorted.length}</p>
+          )}
+        </div>
+      )}
+
       {/* Tabla */}
-      <div className="relative rounded-2xl bg-white dark:bg-slate-900 shadow-soft overflow-hidden">
+      <div className={cn('relative rounded-2xl bg-white dark:bg-slate-900 shadow-soft overflow-hidden', renderCard && 'hidden sm:block')}>
 
         {/* Overlay de carga */}
         {loading && (
@@ -377,31 +530,7 @@ export function DataTable<T>({
                   {hasActions && (
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5">
-                        {(useOverflowMenu ? actions!.filter(a => a.primary) : actions!).map((action, ai) => {
-                          if (action.hidden?.(row)) return null
-                          const { Icon, label, variant, disabled } = resolveAction(action, row)
-                          return (
-                            <button
-                              key={ai}
-                              onClick={() => !disabled && action.onClick(row)}
-                              disabled={disabled}
-                              title={label}
-                              className={cn(
-                                'rounded-lg border p-1.5 transition-colors',
-                                disabled
-                                  ? 'cursor-not-allowed border-gray-200 dark:border-slate-700 text-gray-300 dark:text-slate-600'
-                                  : variant === 'danger'
-                                    ? 'border-red-200 dark:border-red-900/40 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20'
-                                    : 'border-gray-200 dark:border-slate-700 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-                              )}
-                            >
-                              <Icon size={14} />
-                            </button>
-                          )
-                        })}
-                        {useOverflowMenu && (
-                          <RowActionsMenu row={row} actions={actions!.filter(a => !a.primary && !a.hidden?.(row))} />
-                        )}
+                        {renderActionButtons(row)}
                       </div>
                     </td>
                   )}
@@ -423,7 +552,7 @@ export function DataTable<T>({
 
       {/* Footer: info + paginación */}
       {sorted.length > 0 && (
-        <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+        <div className={cn('flex-col items-center justify-between gap-3 sm:flex-row', renderCard ? 'hidden sm:flex' : 'flex')}>
 
           {/* Info + page size */}
           <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-slate-500">

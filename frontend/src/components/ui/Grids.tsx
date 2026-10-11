@@ -10,14 +10,20 @@ const KPI_COLS = {
   4: 'lg:grid-cols-4',
 } as const
 
-/** Grid de KPIs: 1 columna en teléfono, 2 en tablet, `cols` desde lg. */
-export function KpiGrid({ cols = 4, className, children }: {
+/** Grid de KPIs: 1 columna en teléfono, 2 en tablet, `cols` desde lg. Con `compact`, en
+ *  teléfono van 2 por fila con menos relleno (vistas con tabla debajo: Egresos, Ingresos). */
+export function KpiGrid({ cols = 4, compact = false, className, children }: {
   cols?: keyof typeof KPI_COLS
+  compact?: boolean
   className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4', KPI_COLS[cols], className)}>
+    <div className={cn(
+      'grid gap-3 sm:grid-cols-2 sm:gap-4',
+      compact ? 'grid-cols-2 gap-2 max-sm:[&>*]:p-3' : 'grid-cols-1',
+      KPI_COLS[cols], className,
+    )}>
       {children}
     </div>
   )

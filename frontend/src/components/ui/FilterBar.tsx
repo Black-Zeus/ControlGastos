@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { ChevronDown, X, Check } from 'lucide-react'
+import { ChevronDown, X, Check, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -262,6 +262,13 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
   const inputCtrls  = controls.filter(c => c.type === 'input')
   const otherCtrls  = controls.filter(c => c.type !== 'input')
 
+  // Mobile: los filtros secundarios van plegados tras "Filtros (n)" para que la lista quede a mano.
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const activeOthers = otherCtrls.filter(c => {
+    const v = values[c.key]
+    return Array.isArray(v) ? v.length > 0 : !!v
+  }).length
+
   const renderControl = (ctrl: FilterControlDef) => {
     if (ctrl.type === 'input') {
       return (
@@ -355,9 +362,29 @@ export function FilterBar({ controls, values, onChange, actions, onClear }: Filt
         {actionBtns}
       </div>
 
-      {/* Fila 2: filtros select/radio/checkbox + limpiar (columna única en mobile) */}
+      {/* Mobile: botón para desplegar los filtros secundarios */}
+      {otherCtrls.length > 0 && (
+        <div className="flex gap-2 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(o => !o)}
+            aria-expanded={mobileOpen}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            <SlidersHorizontal size={14} />
+            Filtros{activeOthers > 0 && <span className="rounded-full bg-primary-500 px-1.5 text-[10px] font-semibold text-white">{activeOthers}</span>}
+            <ChevronDown size={14} className={cn('transition-transform', mobileOpen && 'rotate-180')} />
+          </button>
+          {!mobileOpen && hasActiveFilter && clearBtn}
+        </div>
+      )}
+
+      {/* Fila 2: filtros select/radio/checkbox + limpiar (columna única en mobile, plegable) */}
       {(otherCtrls.length > 0 || onClear) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className={cn(
+          'flex-col gap-3 sm:flex sm:flex-row sm:flex-wrap sm:items-end',
+          otherCtrls.length === 0 || mobileOpen ? 'flex' : 'hidden',
+        )}>
           {otherCtrls.map(renderControl)}
           {clearBtn}
         </div>
