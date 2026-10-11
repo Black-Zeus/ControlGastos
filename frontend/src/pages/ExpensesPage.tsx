@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2, MessageSquareText,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2, MessageSquareText, Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -351,6 +351,9 @@ function AttachmentPanel({ expenseId, pendingFile, onPendingChange, onPreviewUpl
 }
 
 // ─── AttachmentViewerModal ────────────────────────────────────────────────────
+// Visor del adjunto único del egreso (el backend solo entrega adjuntos de egresos del usuario).
+// No lista otros archivos: muestra el adjunto y ofrece descargarlo, también cuando el navegador
+// (p. ej. Chrome en Android) no puede mostrar el PDF embebido.
 
 function AttachmentViewerModal({
   expense,
@@ -361,99 +364,106 @@ function AttachmentViewerModal({
   initialAtt?: AttachmentOut
   onClose: () => void
 }) {
-  const [attachments, setAttachments] = useState<AttachmentOut[]>([])
   const [preview, setPreview] = useState<{ att: AttachmentOut; blobUrl: string } | null>(null)
-  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    userApi.attachments.list(expense.id).then(atts => {
-      setAttachments(atts)
-      // Con 1 adjunto máximo, ir directo al preview
-      const target = initialAtt
-        ? atts.find(a => a.id === initialAtt.id) ?? atts[0]
-        : atts[0]
-      if (target) openPreview(target)
-    })
+    let blobUrl: string | null = null
+    let cancelled = false
+    ;(async () => {
+      try {
+        const atts = await userApi.attachments.list(expense.id)
+        const att = (initialAtt && atts.find(a => a.id === initialAtt.id)) ?? atts[0]
+        if (!att) { if (!cancelled) setError('Este egreso no tiene adjunto.'); return }
+        const resp = await fetch(userApi.attachments.contentUrl(expense.id, att.id), {
+          headers: { Authorization: `Bearer ${authToken()}` },
+        })
+        if (!resp.ok) throw new Error('No se pudo cargar el adjunto')
+        const blob = await resp.blob()
+        if (cancelled) return
+        blobUrl = URL.createObjectURL(blob)
+        setPreview({ att, blobUrl })
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar adjunto')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expense.id])
 
-  useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview.blobUrl)
-    }
-  }, [preview])
-
-  async function openPreview(att: AttachmentOut) {
-    setLoadingPreview(true)
-    try {
-      const resp = await fetch(userApi.attachments.contentUrl(expense.id, att.id), {
-        headers: { Authorization: `Bearer ${authToken()}` },
-      })
-      const blob = await resp.blob()
-      if (preview) URL.revokeObjectURL(preview.blobUrl)
-      setPreview({ att, blobUrl: URL.createObjectURL(blob) })
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Error al cargar adjunto')
-    } finally {
-      setLoadingPreview(false)
-    }
+  function download() {
+    if (!preview) return
+    const a = document.createElement('a')
+    a.href = preview.blobUrl
+    a.download = preview.att.original_filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
   }
 
-  function closePreview() {
-    if (preview) URL.revokeObjectURL(preview.blobUrl)
-    setPreview(null)
-  }
+  const isImage = preview?.att.mime_type.startsWith('image/')
+  const downloadBtn = (label: string, primary = false) => (
+    <button
+      onClick={download}
+      className={cn(
+        'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
+        primary
+          ? 'bg-primary-500 text-white hover:bg-primary-600'
+          : 'border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
+      )}
+    >
+      <Download size={14} /> {label}
+    </button>
+  )
 
   return (
     <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      {/* En vista previa: 70% del ancho (15% libre por lado) desde sm; en mobile, ancho completo. */}
-      <div className={cn('relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 max-h-[90dvh]', preview ? 'sm:w-[70vw] sm:max-w-none' : 'max-w-3xl')}>
+      {/* 70% del ancho (15% libre por lado) desde sm; en mobile, ancho completo. */}
+      <div className="relative flex max-h-[90dvh] w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 sm:w-[70vw] sm:max-w-none">
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-6 sm:py-4 shrink-0">
+        <div className="flex shrink-0 items-start justify-between border-b border-gray-100 px-4 py-3 dark:border-slate-800 sm:px-6 sm:py-4">
           <div className="min-w-0">
-            {preview ? (
-              <>
-                <h2 className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{preview.att.original_filename}</h2>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
-                  Registrado el {fmtDate(preview.att.uploaded_at.split('T')[0])} · {fmtBytes(preview.att.size_bytes)}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Adjuntos</h2>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">{expense.label}</p>
-              </>
-            )}
+            <h2 className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">
+              {preview?.att.original_filename ?? 'Adjunto'}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+              {preview
+                ? <>Registrado el {fmtDate(preview.att.uploaded_at.split('T')[0])} · {fmtBytes(preview.att.size_bytes)}</>
+                : expense.label}
+            </p>
           </div>
-          <div className="flex items-center gap-1 shrink-0 ml-4">
-            {preview && (
-              <button
-                onClick={closePreview}
-                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800"
-              >
-                Volver
-              </button>
-            )}
-            <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
+          <div className="ml-4 flex shrink-0 items-center gap-1.5">
+            {preview && downloadBtn('Descargar')}
+            <button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800">
               <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-6">
-          {loadingPreview && (
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-6">
+          {loading && (
             <div className="flex h-64 items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
             </div>
           )}
 
-          {!loadingPreview && preview && (
-            <div className="flex items-center justify-center min-h-[300px]">
-              {preview.att.mime_type.startsWith('image/') ? (
+          {!loading && error && (
+            <p className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{error}</p>
+          )}
+
+          {!loading && preview && (
+            <div className="flex min-h-[300px] items-center justify-center">
+              {isImage ? (
                 <img
                   src={preview.blobUrl}
                   alt={preview.att.original_filename}
@@ -465,37 +475,14 @@ function AttachmentViewerModal({
                   type="application/pdf"
                   className="h-[65vh] w-full rounded-lg"
                 >
-                  <p className="text-sm text-gray-500">No se puede mostrar el PDF en este navegador.</p>
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <FileText size={36} className="text-red-400" />
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                      Este navegador no puede mostrar el PDF aquí.
+                    </p>
+                    {downloadBtn('Descargar PDF', true)}
+                  </div>
                 </object>
-              )}
-            </div>
-          )}
-
-          {!loadingPreview && !preview && (
-            <div>
-              {attachments.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-8">Sin adjuntos</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {attachments.map(att => (
-                    <button
-                      key={att.id}
-                      onClick={() => openPreview(att)}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 dark:border-slate-700 p-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-left group"
-                    >
-                      {att.mime_type.startsWith('image/') ? (
-                        <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-800">
-                          <Eye size={18} className="text-gray-300 group-hover:text-primary-400 transition-colors" />
-                        </div>
-                      ) : (
-                        <div className="flex h-20 w-full items-center justify-center rounded-lg bg-red-50 dark:bg-red-900/20">
-                          <FileText size={28} className="text-red-400" />
-                        </div>
-                      )}
-                      <p className="w-full truncate text-center text-xs font-medium text-gray-600 dark:text-slate-400">{att.original_filename}</p>
-                    </button>
-                  ))}
-                </div>
               )}
             </div>
           )}
