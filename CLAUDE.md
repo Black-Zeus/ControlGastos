@@ -108,8 +108,8 @@ docker compose --env-file .env --env-file .env.dev -f docker-compose-dev.yml dow
 ```
 
 Servicios: `backend` (puerto 8000, `--reload`), `frontend` (Vite, vía proxy `nginx`),
-`proxy` (puerto 80, nginx sin TLS), `db`, `storage` (MinIO), `gotenberg`, `redis`, `mailpit`
-(puerto 8025, captura correos salientes en dev), `ocr-worker`, `reminder-worker`. En dev, docs de
+`proxy` (puerto 8080, nginx sin TLS), `db`, `storage` (MinIO), `gotenberg`, `redis`, `mailpit`
+(puerto 9025, captura correos salientes en dev), `ocr-worker`, `reminder-worker`. En dev, docs de
 FastAPI disponibles en `/api/docs` (`debug=true`).
 
 También existe `docker_tools_v3.sh`, un gestor interactivo (menú, no acepta flags de línea de
