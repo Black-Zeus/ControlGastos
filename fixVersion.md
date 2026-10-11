@@ -5,6 +5,24 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
+## 0.4.3 — Desplegada el 2026-10-11
+
+Solo frontend, sin migraciones (Alembic `99e116fc4116`). Se recrea únicamente `frontend`; backend
+y workers reutilizan las imágenes de 0.4.2 reetiquetadas (el backend sigue reportando `0.4.2`).
+
+### Vista para teléfono (< 640 px)
+- Egresos, Ingresos y Listas de compra (índice y detalle) se muestran como tarjetas: sin scroll
+  horizontal, acciones siempre visibles (botones de 36 px y menú ⋯), sin paginación ("Mostrar más").
+- Selector de orden (borde de 2 px) y "Todos" para la selección múltiple sobre las tarjetas.
+- Egresos: detalle expandible con desglose compacto (cantidad × precio bajo cada producto).
+- Lista de compra: check grande, cantidad con − / +, valor a ancho completo (ámbar si falta) y
+  barra inferior fija con progreso, total y "Enviar a egreso".
+- KPIs de a 2 por fila en Egresos/Ingresos y ocultos en el detalle de lista; filtros secundarios
+  plegados tras "Filtros (n)" en todas las vistas con filtros.
+- Escritorio sin cambios.
+
+---
+
 ## 0.4.2 — Desplegada el 2026-10-11
 
 Sin migraciones (Alembic `99e116fc4116`). Se recrean `frontend` y `backend`; los workers

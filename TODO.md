@@ -32,11 +32,23 @@ todo cambio va bajo `sm:`/`lg:` para no alterar escritorio.
 
 ---
 
-## [PENDIENTE] Listas de compra — UX mobile (detalle de lista)
+## [EN PROGRESO] Listas de compra — UX mobile (detalle de lista)
 
 Mejora visual y de usabilidad de `ShoppingListDetailPage.tsx` en teléfono (320–480 px), pensada
 para usarla **en el supermercado con una mano**. Sin cambios de backend. Mantener escritorio igual
 (todo bajo `sm:`). Base: 0.4.1 (refrescos silenciosos y actualización optimista ya resueltos).
+
+### Hecho en 0.4.3
+
+- Tarjetas en mobile vía `DataTable.renderCard` (índice y detalle): check de 24 px (también al
+  tocar el nombre), cantidad con − / +, valor a ancho completo con borde ámbar si falta, total.
+- Barra inferior fija con "X de Y comprados", total y "Enviar a egreso"; KPIs ocultos en mobile.
+- Lista continua ("Mostrar más" de a 30), selector de orden, filtros plegados tras "Filtros (n)".
+
+### Queda pendiente
+
+- Filtro Pendientes/Comprados como control segmentado y buscador fijo arriba.
+- Alta rápida en línea al final de la lista; animación al marcar y "Deshacer" al eliminar.
 
 ### Problema actual
 
@@ -76,12 +88,27 @@ para usarla **en el supermercado con una mano**. Sin cambios de backend. Mantene
 
 ---
 
-## [PENDIENTE] Egresos e Ingresos — UX mobile
+## [EN PROGRESO] Egresos e Ingresos — UX mobile
 
 Misma línea que la lista de compra, para `ExpensesPage.tsx` (~1.970 líneas) e `IncomesPage.tsx`.
 Uso típico en teléfono: **registrar rápido** un gasto/ingreso y **marcarlo pagado/recibido**. Sin
 cambios de backend; escritorio igual (todo bajo `sm:`). Conviene hacer primero Ingresos (más simple)
 y reutilizar el componente de tarjeta en Egresos.
+
+### Hecho en 0.4.3
+
+- Tarjetas en mobile (descripción + monto; fecha · categoría · responsable; chips de pago,
+  borrador, tipo, obviable, adjunto). Acciones de 36 px y menú ⋯; detalle expandible con desglose
+  compacto (cant. × precio bajo el producto).
+- Selección múltiple con "Todos" y casilla por tarjeta; selector de orden; "Mostrar más".
+- KPIs de a 2 por fila en mobile; filtros secundarios plegados tras "Filtros (n)".
+- Página/posición conservadas al editar (0.4.2).
+
+### Queda pendiente
+
+- Acción primaria con texto según estado y swipe; menú ⋯ como bottom sheet.
+- Botón flotante "+" (FAB) con alta rápida; agrupación por día con subtotal.
+- Toast "Deshacer" al eliminar; barra inferior para acciones masivas.
 
 ### Problema actual
 
