@@ -5,9 +5,64 @@ Registro de cambios por versión. La versión vive en `frontend/package.json` y 
 
 ---
 
-## 0.4.0 — Pendiente de despliegue
+## 0.4.2 — Desplegada el 2026-10-11
 
-Preparada el 2026-10-02; se despliega en producción la semana siguiente.
+Sin migraciones (Alembic `99e116fc4116`). Se recrean `frontend` y `backend`; los workers
+reutilizan sus imágenes de 0.4.0 reetiquetadas como `0.4.2-<commit>`. La imagen del backend se
+construye sobre la de 0.4.0 copiando solo `app/` (mismas dependencias, verificadas en la CPU del host).
+
+### Tablas
+- Orden numérico real en montos/cantidades (antes se comparaban como texto) y vacíos al final.
+- Lista de compra: "Valor unitario" ordenable; "Total" y "Cantidad" ordenan por número.
+- Egresos e Ingresos conservan página y posición al crear/editar/pagar o usar acciones masivas.
+
+### Modales
+- El fondo (overlay) cubre toda la pantalla: un margen heredado dejaba 20 px arriba sin cubrir
+  y permitía hacer clic o seleccionar el contenido de atrás.
+- Con un modal abierto el scroll de la app queda bloqueado (también con modales apilados); el
+  modal hace scroll interno. Alto máximo 90% de la pantalla.
+- Vistas previas de PDF/adjuntos al 70% del ancho (15% por lado) y 90% del alto desde tablet.
+
+### Observación al enviar una lista a egreso
+- PDF de evidencia: la sección Observación va sobre la tabla de productos; sin dato, "-----".
+- Egresos: al expandir un egreso con desglose y observación, desglose en la col. 1 y
+  observación en la col. 2.
+
+### Desarrollo
+- Entorno dev: proxy en el puerto 8080 y Mailpit en 9025.
+
+---
+
+## 0.4.1 — Desplegada el 2026-10-11
+
+Hotfix solo de frontend, sin migraciones (Alembic sigue en `99e116fc4116`). Commit `266afa5`.
+Solo se recreó el contenedor `frontend`; backend y workers reutilizan las imágenes de 0.4.0
+reetiquetadas como `0.4.1-266afa5` (el backend sigue reportando `version=0.4.0`). Respaldo previo
+(`pg_dump`, `.env.prd`, compose, IDs de imágenes) en el servidor. Frontend sirve `index-DaAPhdYS.js`.
+
+### Listas de compra
+
+- Editar el check, la cantidad o el valor ya no recarga toda la página: se conservan página, orden,
+  filtros y posición. Cambio inmediato en pantalla y sincronización silenciosa de totales.
+- Se descartan respuestas viejas cuando hay varias ediciones seguidas (la pantalla podía mostrar
+  un producto como no comprado estando marcado en la base, y el envío a egreso lo rechazaba).
+- El valor unitario solo se guarda si cambió.
+- "Enviar a egreso" lista por nombre los productos comprados sin valor y deshabilita el envío.
+
+### Despliegue
+
+- `docker-compose.yml` (prd): backend, frontend y workers usan
+  `${PROJECT_NAME}-release-<servicio>:${RELEASE_TAG}` en vez del `:latest` implícito.
+  `RELEASE_TAG` es obligatorio en `.env.prd` (`0.4.1-266afa5`).
+
+---
+
+## 0.4.0 — Desplegada el 2026-10-02
+
+Desplegada el 2026-10-02 en producción, commit `e3f7724`, revisión Alembic
+`99e116fc4116`. Respaldo completo verificado en el servidor y en el host, ensayo aislado de
+restauración/migraciones y validación de datos completados. Integraciones n8n excluidas;
+los canales permanecen deshabilitados. Ver [registro de despliegue](docs/produccion-0.4.0.md).
 
 ### Antes de desplegar (checklist)
 
