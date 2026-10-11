@@ -29,6 +29,8 @@ services:
       service.lifecycle: stateless
 
   backend:
+    # Etiqueta inmutable por release (nunca :latest); RELEASE_TAG se define en .env.prd.
+    image: ${PROJECT_NAME}-release-backend:${RELEASE_TAG:?Define RELEASE_TAG en .env.prd}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -66,6 +68,8 @@ services:
       service.lifecycle: stateless
 
   frontend:
+    # Etiqueta inmutable por release (nunca :latest); RELEASE_TAG se define en .env.prd.
+    image: ${PROJECT_NAME}-release-frontend:${RELEASE_TAG:?Define RELEASE_TAG en .env.prd}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -155,6 +159,8 @@ services:
       service.lifecycle: stateless
 
   ocr-worker:
+    # Etiqueta inmutable por release (nunca :latest); RELEASE_TAG se define en .env.prd.
+    image: ${PROJECT_NAME}-release-ocr-worker:${RELEASE_TAG:?Define RELEASE_TAG en .env.prd}
     build:
       context: ./backend
       dockerfile: Dockerfile.ocr
@@ -182,6 +188,8 @@ services:
       service.lifecycle: stateless
 
   reminder-worker:
+    # Etiqueta inmutable por release (nunca :latest); RELEASE_TAG se define en .env.prd.
+    image: ${PROJECT_NAME}-release-reminder-worker:${RELEASE_TAG:?Define RELEASE_TAG en .env.prd}
     build:
       context: ./backend
       dockerfile: Dockerfile.reminder

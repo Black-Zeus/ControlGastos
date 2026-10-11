@@ -18,6 +18,9 @@ trash/
 !APP/logs/prd/.gitkeep
 !APP/volumes/.gitkeep
 
+# ── Documentación privada (ubicación de producción, infraestructura) ──
+docs/privado/
+
 # ── Backups ──────────────────────────────────────────────────
 docker-backups/*
 !docker-backups/.gitkeep
