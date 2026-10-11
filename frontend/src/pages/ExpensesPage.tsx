@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Check, ListTree, Wallet,
   CreditCard, Repeat, Lock, Unlock, AlertTriangle, CalendarRange,
-  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2,
+  FileText, Upload, Eye, RefreshCw, ShoppingCart, Undo2, MessageSquareText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,6 +22,7 @@ import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -404,9 +405,11 @@ function AttachmentViewerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-3 sm:p-4">
+      <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-xl flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]">
+      {/* En vista previa: 70% del ancho (15% libre por lado) desde sm; en mobile, ancho completo. */}
+      <div className={cn('relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 max-h-[90dvh]', preview ? 'sm:w-[70vw] sm:max-w-none' : 'max-w-3xl')}>
 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-6 sm:py-4 shrink-0">
@@ -441,7 +444,7 @@ function AttachmentViewerModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-6">
           {loadingPreview && (
             <div className="flex h-64 items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
@@ -1086,7 +1089,8 @@ function ExpenseForm({
 
     {/* Overlay: analizando imagen con OCR (cubre el modal de nuevo egreso) */}
     {ocrAnalyzing && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 !m-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <ScrollLock />
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-slate-900 px-8 py-6 shadow-xl">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
           <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Analizando imagen…</p>
@@ -1096,8 +1100,9 @@ function ExpenseForm({
 
     {/* Overlay: la imagen propone datos distintos a los ya cargados — confirmar reemplazo */}
     {ocrProposal && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
-        <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
+      <div className="fixed inset-0 !m-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
+        <ScrollLock />
+        <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
           <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
             El formulario ya tiene datos cargados. La imagen sugiere{' '}
@@ -1206,59 +1211,72 @@ function ExpenseBreakdown({ expense, currency }: { expense: Expense; currency: s
       ? { label: 'Lista de compra', cls: 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' }
       : { label: 'Desglose manual', cls: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' }
 
+  const observation = expense.observation?.trim()
+
+  // Con observación: col 1 = tabla del desglose, col 2 = observación (apiladas en mobile).
   return (
-    <div className="ml-6 max-w-2xl overflow-hidden rounded-xl border border-gray-100 bg-white shadow-soft dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-slate-800">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-          <ListTree size={13} /> Desglose · {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
-        </p>
-        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', origin.cls)}>{origin.label}</span>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-slate-500">
-            <th className="px-4 py-1.5 text-left font-medium">Producto</th>
-            {hasQty && <th className="px-3 py-1.5 text-right font-medium">Cant.</th>}
-            {hasQty && <th className="px-3 py-1.5 text-right font-medium">P. unitario</th>}
-            <th className="px-4 py-1.5 text-right font-medium">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it, i) => (
-            <tr key={i} className="border-t border-gray-50 even:bg-gray-50/60 dark:border-slate-800 dark:even:bg-slate-800/30">
-              <td className="px-4 py-1.5 text-gray-700 dark:text-slate-300">
-                {it.label}
-                {it.obviable && (
-                  <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">obviable</span>
+    <div className={cn('ml-6 grid gap-3', observation ? 'max-w-4xl lg:grid-cols-[minmax(0,1fr)_18rem]' : 'max-w-2xl')}>
+      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-soft dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-slate-800">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+            <ListTree size={13} /> Desglose · {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
+          </p>
+          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', origin.cls)}>{origin.label}</span>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-slate-500">
+              <th className="px-4 py-1.5 text-left font-medium">Producto</th>
+              {hasQty && <th className="px-3 py-1.5 text-right font-medium">Cant.</th>}
+              {hasQty && <th className="px-3 py-1.5 text-right font-medium">P. unitario</th>}
+              <th className="px-4 py-1.5 text-right font-medium">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i} className="border-t border-gray-50 even:bg-gray-50/60 dark:border-slate-800 dark:even:bg-slate-800/30">
+                <td className="px-4 py-1.5 text-gray-700 dark:text-slate-300">
+                  {it.label}
+                  {it.obviable && (
+                    <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">obviable</span>
+                  )}
+                </td>
+                {hasQty && (
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                    {it.quantity ? Number(it.quantity).toLocaleString('es-CL') : '—'}
+                  </td>
                 )}
+                {hasQty && (
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
+                    {it.unit_price ? fmtMoney(Number(it.unit_price), currency) : '—'}
+                  </td>
+                )}
+                <td className="whitespace-nowrap px-4 py-1.5 text-right font-medium tabular-nums text-gray-900 dark:text-slate-100">
+                  {fmtMoney(Number(it.amount), currency)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-gray-200 dark:border-slate-700">
+              <td colSpan={hasQty ? 3 : 1} className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400">
+                {obviableTotal > 0 && <>Incluye obviables: <span className="tabular-nums">{fmtMoney(obviableTotal, currency)}</span></>}
               </td>
-              {hasQty && (
-                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
-                  {it.quantity ? Number(it.quantity).toLocaleString('es-CL') : '—'}
-                </td>
-              )}
-              {hasQty && (
-                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-slate-400">
-                  {it.unit_price ? fmtMoney(Number(it.unit_price), currency) : '—'}
-                </td>
-              )}
-              <td className="whitespace-nowrap px-4 py-1.5 text-right font-medium tabular-nums text-gray-900 dark:text-slate-100">
-                {fmtMoney(Number(it.amount), currency)}
+              <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-slate-100">
+                {fmtMoney(total, currency)}
               </td>
             </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-gray-200 dark:border-slate-700">
-            <td colSpan={hasQty ? 3 : 1} className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400">
-              {obviableTotal > 0 && <>Incluye obviables: <span className="tabular-nums">{fmtMoney(obviableTotal, currency)}</span></>}
-            </td>
-            <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-slate-100">
-              {fmtMoney(total, currency)}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+          </tfoot>
+        </table>
+      </div>
+      {observation && (
+        <div className="h-fit rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-soft dark:border-slate-700 dark:bg-slate-900">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+            <MessageSquareText size={13} /> Observación
+          </p>
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-700 dark:text-slate-300">{observation}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -1297,9 +1315,10 @@ export function ExpensesPage() {
       .finally(() => setReady(true))
   }, [])
 
-  const load = useCallback(async () => {
+  // silent: refresco tras crear/editar sin overlay (la tabla conserva página y orden).
+  const load = useCallback(async (silent = false) => {
     if (!ready || year === null || month === null) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const [exps, incs, lists, cats, periods] = await Promise.all([
         userApi.expenses.list(year, month),
@@ -1315,7 +1334,7 @@ export function ExpensesPage() {
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [year, month, ready])
 
@@ -1434,7 +1453,7 @@ export function ExpensesPage() {
       })
       setSelectedIds(new Set())
       setModal(null)
-      await load()
+      await load(true)
     } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
@@ -1804,6 +1823,7 @@ export function ExpensesPage() {
         actions={actions}
         rowKey={e => e.id}
         loading={loading}
+        pageResetKey={JSON.stringify([year, month, range, filters])}
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}

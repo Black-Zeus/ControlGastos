@@ -12,6 +12,8 @@ export interface Column<T> {
   key: string
   label: string
   sortable?: boolean
+  /** Valor para ordenar cuando `row[key]` no existe o no sirve (columnas calculadas, montos). */
+  sortValue?: (row: T) => string | number | null | undefined
   className?: string
   headerClassName?: string
   /** Si no se provee, muestra row[key] como string */
@@ -75,6 +77,22 @@ function getPageNumbers(current: number, total: number): (number | '…')[] {
 
 function getValue<T>(row: T, key: string): unknown {
   return (row as Record<string, unknown>)[key]
+}
+
+const NUMERIC_RE = /^-?\d+(\.\d+)?$/
+
+/** Compara numéricamente si ambos valores son números (o strings numéricos como los Decimal
+ *  de la API, p. ej. "1500.00"); si no, texto con orden natural. Vacíos siempre al final. */
+function compareValues(av: unknown, bv: unknown, dir: 'asc' | 'desc'): number {
+  const aEmpty = av === null || av === undefined || av === ''
+  const bEmpty = bv === null || bv === undefined || bv === ''
+  if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1
+  const an = typeof av === 'number' ? av : NUMERIC_RE.test(String(av)) ? Number(av) : NaN
+  const bn = typeof bv === 'number' ? bv : NUMERIC_RE.test(String(bv)) ? Number(bv) : NaN
+  const cmp = !Number.isNaN(an) && !Number.isNaN(bn)
+    ? an - bn
+    : String(av).localeCompare(String(bv), undefined, { numeric: true })
+  return dir === 'asc' ? cmp : -cmp
 }
 
 function resolveAction<T>(action: RowAction<T>, row: T) {
@@ -199,13 +217,10 @@ export function DataTable<T>({
   useEffect(() => { setPage(1) }, [resetTrigger, pageSize])
 
   // ── Ordenar ──────────────────────────────────────────────────────────────
+  const sortCol = sortKey ? columns.find(c => c.key === sortKey) : undefined
+  const sortValueOf = (row: T) => sortCol?.sortValue ? sortCol.sortValue(row) : getValue(row, sortKey as string)
   const sorted = sortKey
-    ? [...data].sort((a, b) => {
-        const av = getValue(a, sortKey)
-        const bv = getValue(b, sortKey)
-        const cmp = String(av ?? '').localeCompare(String(bv ?? ''), undefined, { numeric: true })
-        return sortDir === 'asc' ? cmp : -cmp
-      })
+    ? [...data].sort((a, b) => compareValues(sortValueOf(a), sortValueOf(b), sortDir))
     : data
 
   // ── Paginar ──────────────────────────────────────────────────────────────

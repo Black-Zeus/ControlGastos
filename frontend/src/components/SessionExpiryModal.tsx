@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 interface Props {
   onRenew: () => Promise<void>
@@ -31,7 +32,8 @@ export function SessionExpiryModal({ onRenew, onExpire }: Props) {
   const progress      = circumference * (1 - seconds / COUNTDOWN)
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 !m-0 z-[9999] flex items-center justify-center p-4">
+      <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 text-center">
 

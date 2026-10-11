@@ -450,16 +450,19 @@ export function ShoppingListDetailPage() {
     },
     {
       key: 'quantity', label: 'Cantidad', sortable: true,
+      sortValue: item => Number(item.quantity),
       className: 'text-center', headerClassName: 'text-center [&>span]:justify-center',
       render: item => <ItemQuantityCell item={item} onChange={v => updateItemQuantity(item, v)} />,
     },
     {
-      key: 'unit_price', label: 'Valor unitario',
+      key: 'unit_price', label: 'Valor unitario', sortable: true,
+      sortValue: item => item.unit_price == null ? null : Number(item.unit_price),
       className: 'text-center', headerClassName: 'text-center [&>span]:justify-center',
       render: item => <ItemUnitPriceCell item={item} currency={currency} onChange={v => updateItemUnitPrice(item, v)} />,
     },
     {
       key: 'total', label: 'Total', sortable: true,
+      sortValue: item => item.unit_price == null ? null : Number(item.quantity) * Number(item.unit_price),
       className: 'text-right', headerClassName: 'text-right',
       render: item => (
         <span className="text-sm font-medium tabular-nums text-gray-700 dark:text-slate-300">

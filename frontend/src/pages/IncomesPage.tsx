@@ -345,9 +345,10 @@ export function IncomesPage() {
       .finally(() => setReady(true))
   }, [])
 
-  const load = useCallback(async () => {
+  // silent: refresco tras crear/editar sin overlay (la tabla conserva página y orden).
+  const load = useCallback(async (silent = false) => {
     if (!ready || year === null || month === null) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const [incs, types, periods] = await Promise.all([
         userApi.incomes.list(year, month),
@@ -359,7 +360,7 @@ export function IncomesPage() {
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [year, month, ready])
 
@@ -452,14 +453,14 @@ export function IncomesPage() {
 
       <FilterBar controls={FILTER_CONTROLS} values={filters} onChange={(k, v) => setFilters(f => ({ ...f, [k]: v }))} onClear={() => setFilters({ search: '', type: '' })} actions={[{ label: 'Nuevo ingreso', icon: Plus, onClick: () => setModal({ type: 'create' }) }]} />
 
-      <DataTable data={filtered} columns={columns} actions={actions} rowKey={i => i.id} loading={loading} emptyMessage="No hay ingresos en este período" defaultPageSize={15} pageSizeOptions={[15, 30, 50]} />
+      <DataTable data={filtered} columns={columns} actions={actions} rowKey={i => i.id} loading={loading} pageResetKey={JSON.stringify([year, month, filters])} emptyMessage="No hay ingresos en este período" defaultPageSize={15} pageSizeOptions={[15, 30, 50]} />
 
       {modal?.type === 'create' && (
         <Modal title="Nuevo ingreso" onClose={() => setModal(null)} size="xl">
           <IncomeForm incomeTypes={incomeTypes} openPeriod={openPeriod} amountStep={amountStep} currency={currency} onCancel={() => setModal(null)} onSubmit={async (data) => {
             await userApi.incomes.create(data)
             setModal(null)
-            await load()
+            await load(true)
           }} />
         </Modal>
       )}
@@ -469,7 +470,7 @@ export function IncomesPage() {
           <IncomeForm initial={modal.income} incomeTypes={incomeTypes} openPeriod={openPeriod} amountStep={amountStep} currency={currency} onCancel={() => setModal(null)} onSubmit={async (data) => {
             await userApi.incomes.update(modal.income.id, data)
             setModal(null)
-            await load()
+            await load(true)
           }} />
         </Modal>
       )}

@@ -110,8 +110,11 @@ def build_shopping_list_evidence_html(
         f'<div class="row muted"><span>Incluye obviables</span><span>{_fmt(obviable_total, currency)}</span></div>'
         if obviable_total > 0 else ''
     )
+    # La observación (glosa) va siempre sobre la tabla de productos; sin dato, "-----".
+    obs_text = (observation or '').strip()
     obs_html = (
-        f'<div class="obs"><span>Observación</span><p>{_e(observation)}</p></div>' if observation else ''
+        f'<div class="obs{"" if obs_text else " empty"}"><span>Observación</span>'
+        f'<p>{_e(obs_text) if obs_text else "-----"}</p></div>'
     )
 
     return f"""<!doctype html>
@@ -167,7 +170,9 @@ def build_shopping_list_evidence_html(
 
   .obs {{ margin-top: 14px; background: #f9fafb; border-left: 3px solid #10b981; border-radius: 6px; padding: 8px 12px; }}
   .obs span {{ font-size: 8.5px; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; }}
-  .obs p {{ margin: 3px 0 0; }}
+  .obs p {{ margin: 3px 0 0; white-space: pre-wrap; }}
+  .obs.empty {{ border-left-color: #d1d5db; }}
+  .obs.empty p {{ color: #9ca3af; }}
 
   .footer {{ position: absolute; left: 16mm; right: 16mm; bottom: 9mm; display: flex; align-items: center;
              gap: 8px; border-top: 1px solid #e5e7eb; padding-top: 6px; color: #9ca3af; font-size: 8.5px; }}
@@ -191,6 +196,8 @@ def build_shopping_list_evidence_html(
     <h2>Detalle</h2>
     <dl>{meta_html}</dl>
 
+    {obs_html}
+
     <h2>Productos</h2>
     <table>
       <thead><tr><th>#</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio unitario</th><th class="num">Subtotal</th></tr></thead>
@@ -201,7 +208,6 @@ def build_shopping_list_evidence_html(
       {obviable_html}
       <div class="row grand"><span>Total</span><span>{_fmt(total, currency)}</span></div>
     </div></div>
-    {obs_html}
   </main>
 
   <footer class="footer">
