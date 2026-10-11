@@ -12,6 +12,7 @@ import { userApi, authToken, type Period } from '@/lib/userApi'
 import { MONTHS_SHORT, calcMetrics, fmtShort, type Metrics } from '@/lib/reportUtils'
 import { KpiGrid } from '@/components/ui/Grids'
 import { ScrollTable } from '@/components/ui/ScrollTable'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -371,6 +372,7 @@ export function ReporteTendenciaPage() {
       {/* Modal procesando */}
       {pdfState === 'loading' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <ScrollLock />
           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white dark:bg-slate-900 px-10 py-8 shadow-2xl">
             <SpinIcon size={36} className="animate-spin text-primary-500" />
             <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">Generando PDF…</p>

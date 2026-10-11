@@ -5,6 +5,7 @@ import { adminApi, type IngestionToken, type User } from '@/lib/adminApi'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 import { FilterBar, type FilterControlDef } from '@/components/ui/FilterBar'
 import { KpiGrid } from '@/components/ui/Grids'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,8 @@ function ConfirmToggleModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 sm:px-4">
-      <div className="w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-5 space-y-4">
+      <ScrollLock />
+      <div className="w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-5 space-y-4">
         <div>
           <h2 className="text-sm font-semibold text-gray-900 dark:text-slate-100">
             ¿Revocar este token?
@@ -123,7 +125,8 @@ function CreateTokenModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 sm:px-4">
-      <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
+      <ScrollLock />
+      <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-5 py-4">

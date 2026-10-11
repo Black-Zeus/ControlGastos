@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useScrollLock } from '@/hooks/useScrollLock'
 
 // ─── Modal compartido ─────────────────────────────────────────────────────────
 // Reemplaza las copias locales de `Modal` de cada página. En mobile ocupa casi
@@ -28,10 +28,7 @@ interface ModalProps {
 }
 
 export function Modal({ title, onClose, children, size = 'md', closable = true }: ModalProps) {
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
+  useScrollLock()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
@@ -58,7 +55,7 @@ export function Modal({ title, onClose, children, size = 'md', closable = true }
             </button>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">{children}</div>
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import { Download, FileText, X } from 'lucide-react'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 export function PdfPreviewModal({
   title,
@@ -24,6 +25,7 @@ export function PdfPreviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[10vh_10vw]">
+      <ScrollLock />
       <div className="flex h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[80vh] sm:w-[80vw]">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3 shrink-0">

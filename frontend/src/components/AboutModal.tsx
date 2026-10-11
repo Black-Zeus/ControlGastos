@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import logoUrl from '@/assets/logo.png'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 interface AboutModalProps {
   open: boolean
@@ -21,8 +22,9 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6">
+      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-slate-500 dark:hover:bg-slate-800"

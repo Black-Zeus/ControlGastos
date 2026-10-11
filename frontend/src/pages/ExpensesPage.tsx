@@ -22,6 +22,7 @@ import { amountStepFor, parseAmountInput, fmtAmountInput } from '@/lib/money'
 import { useResponsibleTags } from '@/hooks/useResponsibleTags'
 import { FormGrid, KpiGrid } from '@/components/ui/Grids'
 import { Modal } from '@/components/ui/Modal'
+import { ScrollLock } from '@/hooks/useScrollLock'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -405,6 +406,7 @@ function AttachmentViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+      <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-xl flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]">
 
@@ -441,7 +443,7 @@ function AttachmentViewerModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-6">
           {loadingPreview && (
             <div className="flex h-64 items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
@@ -1087,6 +1089,7 @@ function ExpenseForm({
     {/* Overlay: analizando imagen con OCR (cubre el modal de nuevo egreso) */}
     {ocrAnalyzing && (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <ScrollLock />
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-slate-900 px-8 py-6 shadow-xl">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
           <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Analizando imagen…</p>
@@ -1097,7 +1100,8 @@ function ExpenseForm({
     {/* Overlay: la imagen propone datos distintos a los ya cargados — confirmar reemplazo */}
     {ocrProposal && (
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
-        <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
+        <ScrollLock />
+        <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
           <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
             El formulario ya tiene datos cargados. La imagen sugiere{' '}
@@ -1297,9 +1301,10 @@ export function ExpensesPage() {
       .finally(() => setReady(true))
   }, [])
 
-  const load = useCallback(async () => {
+  // silent: refresco tras crear/editar sin overlay (la tabla conserva página y orden).
+  const load = useCallback(async (silent = false) => {
     if (!ready || year === null || month === null) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const [exps, incs, lists, cats, periods] = await Promise.all([
         userApi.expenses.list(year, month),
@@ -1315,7 +1320,7 @@ export function ExpensesPage() {
       setAllPeriods(periods)
       setPeriod(periods.find(p => p.year === year && p.month === month) ?? null)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [year, month, ready])
 
@@ -1434,7 +1439,7 @@ export function ExpensesPage() {
       })
       setSelectedIds(new Set())
       setModal(null)
-      await load()
+      await load(true)
     } catch (e) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
@@ -1804,6 +1809,7 @@ export function ExpensesPage() {
         actions={actions}
         rowKey={e => e.id}
         loading={loading}
+        pageResetKey={JSON.stringify([year, month, range, filters])}
         emptyMessage="No hay egresos en este período"
         defaultPageSize={15}
         pageSizeOptions={[15, 30, 50]}
