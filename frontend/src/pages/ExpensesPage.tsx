@@ -405,11 +405,11 @@ function AttachmentViewerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <ScrollLock />
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       {/* En vista previa: 70% del ancho (15% libre por lado) desde sm; en mobile, ancho completo. */}
-      <div className={cn('relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]', preview ? 'sm:w-[70vw] sm:max-w-none' : 'max-w-3xl')}>
+      <div className={cn('relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900 max-h-[90dvh]', preview ? 'sm:w-[70vw] sm:max-w-none' : 'max-w-3xl')}>
 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-6 sm:py-4 shrink-0">
@@ -1089,7 +1089,7 @@ function ExpenseForm({
 
     {/* Overlay: analizando imagen con OCR (cubre el modal de nuevo egreso) */}
     {ocrAnalyzing && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 !m-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <ScrollLock />
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-slate-900 px-8 py-6 shadow-xl">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
@@ -1100,9 +1100,9 @@ function ExpenseForm({
 
     {/* Overlay: la imagen propone datos distintos a los ya cargados — confirmar reemplazo */}
     {ocrProposal && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 !m-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
         <ScrollLock />
-        <div className="w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
+        <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-4 sm:p-6">
           <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Datos detectados en la imagen</h3>
           <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
             El formulario ya tiene datos cargados. La imagen sugiere{' '}

@@ -24,9 +24,9 @@ export function PdfPreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[10vh_15vw]">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[5vh_15vw]">
       <ScrollLock />
-      <div className="flex h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[80vh] sm:w-[70vw]">
+      <div className="flex h-[90dvh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[90vh] sm:w-[70vw]">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">

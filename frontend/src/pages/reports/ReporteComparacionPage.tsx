@@ -388,7 +388,7 @@ export function ReporteComparacionPage() {
 
       {/* Modal procesando */}
       {pdfState === 'loading' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <ScrollLock />
           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white dark:bg-slate-900 px-10 py-8 shadow-2xl">
             <SpinIcon size={36} className="animate-spin text-primary-500" />

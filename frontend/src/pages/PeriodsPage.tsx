@@ -129,9 +129,9 @@ function PdfPreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[10vh_15vw]">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-[5vh_15vw]">
       <ScrollLock />
-      <div className="flex h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[80vh] sm:w-[70vw]">
+      <div className="flex h-[90dvh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 sm:h-[90vh] sm:w-[70vw]">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
@@ -221,9 +221,9 @@ function OpenPeriodModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <ScrollLock />
-      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
         <div className="flex items-center gap-3 mb-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
             <Unlock size={18} className="text-green-600 dark:text-green-400" />
@@ -339,7 +339,7 @@ function ClosePeriodModal({
   if (pendingIncCount > 0) pendingParts.push(`${pendingIncCount} ingreso${pendingIncCount !== 1 ? 's' : ''}`)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <ScrollLock />
       <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 overflow-hidden">
 
@@ -447,9 +447,9 @@ function ConfirmReopenModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <ScrollLock />
-      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30">
             <RotateCcw size={18} className="text-orange-600 dark:text-orange-400" />
@@ -511,9 +511,9 @@ function DeletePeriodModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <ScrollLock />
-      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/30">
             <Trash2 size={18} className="text-red-600 dark:text-red-400" />

@@ -66,9 +66,9 @@ function LinkCodeModal({ channel, onClose, onLinked }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <ScrollLock />
-      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[90dvh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Vincular {meta.label}</h3>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -218,9 +218,9 @@ export function IntegrationsPage() {
       )}
 
       {unlinkTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setUnlinkTarget(null)}>
+        <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setUnlinkTarget(null)}>
           <ScrollLock />
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-xl p-6 max-h-[90dvh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">
               Desvincular {CHANNEL_META[unlinkTarget.channel].label}
             </h3>

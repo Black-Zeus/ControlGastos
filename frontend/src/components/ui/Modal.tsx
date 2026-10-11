@@ -31,7 +31,7 @@ export function Modal({ title, onClose, children, size = 'md', closable = true }
   useScrollLock()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 !m-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         role="dialog"
@@ -39,7 +39,7 @@ export function Modal({ title, onClose, children, size = 'md', closable = true }
         aria-label={title}
         className={cn(
           'relative flex w-full flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-900',
-          'max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)]',
+          'max-h-[90dvh] sm:max-h-[90dvh]',
           MAX_W[size],
         )}
       >
